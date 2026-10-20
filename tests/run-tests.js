@@ -88,8 +88,18 @@ const xlsxSheets = sandbox.__X.xlsxSheets;
 const XLSXLite = sandbox.__X.XLSXLite;
 
 console.log('\n== Целостность данных ==');
-ok(CPR.ROLES.length === 9, `9 ролей в книге игрока (факт: ${CPR.ROLES.length})`);
+ok(CPR.ROLES.length === 10, `10 ролей в книге игрока (факт: ${CPR.ROLES.length})`);
 ok(CPR.ROLES.every(r => r.archetypes.length === 3), 'у каждой роли 3 архетипа');
+ok(CPR.ROLES.every(r => !!r.ability), 'у каждой роли указана особость (Role Ability)');
+{
+  const skillKeys = new Set(CPR.SKILLS.map(s => s.key));
+  const badSkills = [];
+  CPR.ROLES.forEach(r => r.archetypes.forEach(a => (a.skills || []).forEach(([k]) => { if (!skillKeys.has(k)) badSkills.push(r.key + '/' + a.key + ':' + k); })));
+  ok(badSkills.length === 0, 'все навыки ролей существуют ' + (badSkills.length ? '(плохие: ' + badSkills + ')' : ''));
+  const attrKeys = new Set(['cs','cn','co','d4','em','ia','lu','ref','re','tech']);
+  const badAttrs = CPR.ROLES.filter(r => r.archetypes.some(a => !a.attrs || Object.keys(a.attrs).some(k => !attrKeys.has(k)))).map(r => r.key);
+  ok(badAttrs.length === 0, 'у всех архетипов заданы атрибуты шаблона (стр. 74–77) ' + (badAttrs.length ? '(нет: ' + badAttrs + ')' : ''));
+}
 ok(CPR.BACKGROUNDS.length === 8, '8 происхождений');
 ok(CPR.PRESETS.length === 3, '3 готовых варианта создания');
 {
@@ -103,9 +113,9 @@ console.log('\n== Вариант 1: Уличная крыса ==');
 {
   const c = genPreset('rat');
   ok(!!c, 'персонаж создан');
-  ok(c.role === 'solo' && c.archetype === 'gunfighter', 'Соло / Стрелок');
+  ok(c.role === 'solo' && c.archetype === 'hitman', 'Соло / Наёмный убийца');
   ok(c.background === 'choomb', 'происхождение «Чумба из трущоб»');
-  ok(c.attrs.ref === 6 && c.attrs.lu === 2, 'фокус REF=6, LU=2 (правило книги)');
+  ok(c.attrs.ref >= 6 && c.attrs.lu >= 5, 'фокус REF≥6, LU≥5 (правило книги)');
   ok(c.skills.handguns >= 4, 'Пистолеты ≥ 4 (' + c.skills.handguns + ')');
   ok(!c.lifepath, 'без Жизненного пути (быстрый старт)');
   ok(c.gear.length >= 5 && c.credits === 350, 'минимальное снаряжение и €$ 350');
@@ -117,8 +127,8 @@ console.log('\n== Вариант 2: Эджраннер ==');
 {
   const c = genPreset('edge');
   ok(!!c, 'персонаж создан');
-  ok(c.role === 'netrunner' && c.archetype === 'brainiac', 'Нетраннер / Гений');
-  ok(c.attrs.ia === 6 && c.attrs.ref === 5 && c.attrs.lu === 2, 'фокус IA=6, REF=5, LU=2');
+  ok(c.role === 'netrunner' && c.archetype === 'freelancerunner', 'Нетраннер / Фриланс-раннер');
+  ok(c.attrs.ia >= 5 && c.attrs.tech >= 6 && c.attrs.lu >= 5, 'шаблон Нетраннера: IA≥5, TECH≥6, LU≥5');
   ok(c.skills.programming >= 4 && c.skills.electronics >= 4, 'Программирование и Электроника ≥ 4');
   ok(!!c.lifepath, 'краткий Жизненный путь присутствует');
   ok(c.gear.some(g => /дека/i.test(g)), 'в снаряжении есть кибердека');
@@ -144,17 +154,17 @@ console.log('\n== Базовые способы создания ==');
 {
   const r = genRandom();
   ok(r.method === 'random' && !!r.lifepath, '🎲 Случайно: роль+путь кидаются');
-  const t = genTable('corporate', 'exec', 'corpo');
-  ok(t.role === 'corporate' && t.archetype === 'exec' && t.background === 'corpo', '📋 Ролевая таблица уважает выбор');
-  ok(t.attrs.lu === 2, 'LU=2 при point-buy');
+  const t = genTable('corp', 'executive', 'corpo');
+  ok(t.role === 'corp' && t.archetype === 'executive' && t.background === 'corpo', '📋 Ролевая таблица уважает выбор');
+  ok(t.attrs.lu >= 5, 'LU≥5 по шаблону роли (правило книги)');
   const lp = genLifePath(rollLifePath({}));
   ok(lp.method === 'lifepath' && Object.keys(lp.lifepath).length === 6, '🛤 Жизненный путь: 6 этапов');
 }
 
 console.log('\n== Выбор данных из выпадающих списков (picks) ==');
 {
-  const r = genRandom({ role: 'medic', arch: 'chirurgeon', bg: 'boomer' });
-  ok(r.role === 'medic' && r.archetype === 'chirurgeon' && r.background === 'boomer',
+  const r = genRandom({ role: 'medtech', arch: 'paramedic', bg: 'boomer' });
+  ok(r.role === 'medtech' && r.archetype === 'paramedic' && r.background === 'boomer',
     '🎲 Случайно уважает выбор роль/архетип/происхождение');
   ok(!!r.lifepath, '🎲 Случайно по-прежнему кидает Жизненный путь');
   const lp = genLifePath(rollLifePath({}), { role: 'tinker', arch: 'inventor', bg: 'lantern' });
@@ -162,7 +172,7 @@ console.log('\n== Выбор данных из выпадающих списко
     '🛤 Жизненный путь уважает выбор');
   const attrs = { cs: 5, cn: 5, co: 5, d4: 5, em: 5, ia: 5, lu: 2, ref: 6, re: 5, tech: 5 };
   const skills = {}; CPR.SKILLS.forEach(s2 => skills[s2.key] = 0); skills.handguns = 7;
-  const t = genTable('solo', 'gunfighter', 'street', attrs, skills);
+  const t = genTable('solo', 'hitman', 'street', attrs, skills);
   ok(t.attrs.ref === 6 && t.attrs.tech === 5, '📋 Ручные атрибуты применяются');
   ok(t.skills.handguns === 7 && t.skills.rifles === 0, '📋 Ручные навыки применяются');
 }
