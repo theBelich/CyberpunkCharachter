@@ -118,9 +118,19 @@ function recomputeDerived(c) {
 }
 
 /* ---------- способ 1: СЛУЧАЙНО ---------- */
-function genRandom() {
-  // полностью случайный лист: роль, архетип, происхождение + жизненный путь на d6
-  return makeCharacter({ method: 'random', lifepath: rollLifePath({}) });
+function genRandom(picks = {}) {
+  // полностью случайный лист: роль, архетип, происхождение + жизненный путь на d6;
+  // если пользователь что-то выбрал из выпадающих списков — используем его выбор
+  const opts = { method: 'random', lifepath: rollLifePath(picks.lifepath || {}) };
+  if (picks.role || picks.arch) {
+    const { role, arch } = findRoleArchetype(picks.role, picks.arch);
+    opts.role = role; opts.arch = arch;
+  }
+  if (picks.bg) {
+    const bg = CPR.BACKGROUNDS.find(b => b.key === picks.bg);
+    if (bg) opts.bg = bg;
+  }
+  return makeCharacter(opts);
 }
 
 /* ---------- способ 2: ПО РОЛЕВОЙ ТАБЛИЦЕ (point buy) ---------- */
@@ -154,12 +164,20 @@ function rollLifePath(prev = {}) {
   return lp;
 }
 
-function genLifePath(lpRolls) {
-  // жизненный путь определяет роль через сводную таблицу: берём случайную роль,
-  // но все этапы пути кидаются честно на d6
+function genLifePath(lpRolls, picks = {}) {
+  // жизненный путь определяет роль через сводную таблицу: берём случайную роль
+  // (или выбранную пользователем), но все этапы пути кидаются честно на d6
   const lp = rollLifePath(lpRolls);
-  const c = makeCharacter({ method: 'lifepath', lifepath: lp });
-  return c;
+  const opts = { method: 'lifepath', lifepath: lp };
+  if (picks.role || picks.arch) {
+    const { role, arch } = findRoleArchetype(picks.role, picks.arch);
+    opts.role = role; opts.arch = arch;
+  }
+  if (picks.bg) {
+    const bg = CPR.BACKGROUNDS.find(b => b.key === picks.bg);
+    if (bg) opts.bg = bg;
+  }
+  return makeCharacter(opts);
 }
 
 /* ---------- ГОТОВЫЕ ВАРИАНТЫ (пресеты): уличная крыса / эджраннер / полный пакет ---------- */
@@ -467,25 +485,29 @@ function switchMode(m) {
   $$('.mode-panel').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== m));
 }
 
+/* ---------- универсальный набор связанных дропдаунов (роль → архетип) ---------- */
+function wirePickPair(roleSel, archSel, initRoleKey, initArchKey) {
+  roleSel.innerHTML = CPR.ROLES.map(r => `<option value="${r.key}">${r.name}</option>`).join('');
+  function fillArch(keep) {
+    const role = CPR.ROLES.find(r => r.key === roleSel.value) || CPR.ROLES[0];
+    archSel.innerHTML = role.archetypes.map(a => `<option value="${a.key}">${a.name}</option>`).join('');
+    if (keep && role.archetypes.some(a => a.key === keep)) archSel.value = keep;
+  }
+  if (initRoleKey && CPR.ROLES.some(r => r.key === initRoleKey)) roleSel.value = initRoleKey;
+  else roleSel.value = CPR.ROLES[0].key; // fallback для нестандартных окружений
+  fillArch(initArchKey);
+  roleSel.onchange = () => fillArch();
+}
+
 function buildTableControls() {
   const roleSel = $('#sel-role'), archSel = $('#sel-arch'), bgSel = $('#sel-bg');
-  roleSel.innerHTML = CPR.ROLES.map(r => `<option value="${r.key}">${r.name}</option>`).join('');
-  if (!roleSel.value) roleSel.value = CPR.ROLES[0].key; // fallback для нестандартных окружений
+  wirePickPair(roleSel, archSel);
+  bgSel.innerHTML = CPR.BACKGROUNDS.map(b => `<option value="${b.key}">${b.name}</option>`).join('');
+  if (!CPR.BACKGROUNDS.some(b => b.key === bgSel.value)) bgSel.value = CPR.BACKGROUNDS[0].key;
+
   function currentRole() {
     return CPR.ROLES.find(r => r.key === roleSel.value) || CPR.ROLES[0];
   }
-  function fillArch() {
-    const role = currentRole();
-    archSel.innerHTML = role.archetypes.map(a => `<option value="${a.key}">${a.name}</option>`).join('');
-    if (!role.archetypes.some(a => a.key === archSel.value)) archSel.value = role.archetypes[0].key;
-    showArchInfo();
-  }
-  roleSel.onchange = fillArch;
-  archSel.onchange = showArchInfo;
-  bgSel.innerHTML = CPR.BACKGROUNDS.map(b => `<option value="${b.key}">${b.name}</option>`).join('');
-  if (!CPR.BACKGROUNDS.some(b => b.key === bgSel.value)) bgSel.value = CPR.BACKGROUNDS[0].key;
-  fillArch();
-
   function showArchInfo() {
     const { role, arch } = findRoleArchetype(currentRole().key, archSel.value);
     $('#arch-info').innerHTML = `
@@ -495,6 +517,92 @@ function buildTableControls() {
       <p class="muted small">Ролевые навыки: ${arch.skills.map(([k, v]) => `${CPR.skillByKey(k).name} +${v}`).join(', ') || '—'}.</p>
       <p class="muted small">Очки навыков по категориям: ${Object.entries(arch.typePoints).map(([t, p]) => `${CPR.TYPE_LABELS[t]}: ${p}`).join('; ')}.</p>`;
   }
+  // при смене роли/архетипа/происхождения — обновляем справку и ручные редакторы
+  roleSel.onchange = () => { showArchInfo(); refreshManualEditors(); };
+  archSel.onchange = () => { showArchInfo(); refreshManualEditors(); };
+  bgSel.onchange = refreshManualEditors;
+  showArchInfo();
+}
+
+/* ---------- другие панели: «Случайно» и «Жизненный путь» тоже с выбором ---------- */
+function buildPickPanels() {
+  wirePickPair($('#rnd-role'), $('#rnd-arch'));
+  wirePickPair($('#lp-role'), $('#lp-arch'));
+  [$('#rnd-bg'), $('#lp-bg')].forEach(bgSel => {
+    bgSel.innerHTML = CPR.BACKGROUNDS.map(b => `<option value="${b.key}">${b.name}</option>`).join('');
+    if (!CPR.BACKGROUNDS.some(b => b.key === bgSel.value)) bgSel.value = CPR.BACKGROUNDS[0].key;
+  });
+}
+
+/* ---------- ручные атрибуты и навыки (способ 2, раскрывающийся блок) ---------- */
+let manualAttrs = null;   // { key: value } | null — null значит «по таблице»
+let manualSkills = null;  // { key: level } | null
+
+function defaultAttrsForSelection() {
+  const { arch } = findRoleArchetype($('#sel-role').value, $('#sel-arch').value);
+  return attrsFromArchetype(arch);
+}
+function defaultSkillsForSelection() {
+  const { arch } = findRoleArchetype($('#sel-role').value, $('#sel-arch').value);
+  const bg = CPR.BACKGROUNDS.find(b => b.key === $('#sel-bg').value) || CPR.BACKGROUNDS[0];
+  return baseSkills(arch, bg);
+}
+
+function buildManualEditors() {
+  const attrBox = $('#attr-grid');
+  attrBox.innerHTML = CPR.ATTRS.map(a => `
+    <label class="attr-cell" title="${a.name}">
+      <span>${a.abbr}</span>
+      <select data-attr="${a.key}"></select>
+    </label>`).join('');
+  attrBox.querySelectorAll('[data-attr]').forEach(sel => {
+    sel.innerHTML = [1,2,3,4,5,6,7,8,9,10].map(v => `<option value="${v}">${v}</option>`).join('');
+    sel.onchange = () => { readManualAttrs(); updateSkillEditorHeads(); };
+  });
+
+  const skillBox = $('#skill-editor');
+  skillBox.innerHTML = CPR.SKILLS.map(s => `
+    <label class="skill-cell">
+      <span class="skill-cell-name">${s.name} <i class="attr-tag">${(CPR.attrByKey(s.attr)||{}).abbr||''}</i></span>
+      <select data-skill="${s.key}"></select>
+    </label>`).join('');
+  skillBox.querySelectorAll('[data-skill]').forEach(sel => {
+    sel.innerHTML = Array.from({ length: 11 }, (_, v) => `<option value="${v}">${v}</option>`).join('');
+    sel.onchange = readManualSkills;
+  });
+  refreshManualEditors();
+}
+
+function refreshManualEditors() {
+  if (!$('#attr-grid') || !$('#attr-grid').children.length) return;
+  const attrs = manualAttrs || defaultAttrsForSelection();
+  Object.entries(attrs).forEach(([k, v]) => {
+    const sel = $(`#attr-grid [data-attr="${k}"]`);
+    if (sel) sel.value = String(Math.min(10, Math.max(1, v)));
+  });
+  const skills = manualSkills || defaultSkillsForSelection();
+  Object.entries(skills).forEach(([k, v]) => {
+    const sel = $(`#skill-editor [data-skill="${k}"]`);
+    if (sel) sel.value = String(Math.min(10, Math.max(0, v)));
+  });
+  updateSkillEditorHeads();
+}
+
+function readManualAttrs() {
+  const a = {};
+  $$('#attr-grid [data-attr]').forEach(sel => { a[sel.dataset.attr] = +sel.value; });
+  manualAttrs = a;
+}
+function readManualSkills() {
+  const s = {};
+  $$('#skill-editor [data-skill]').forEach(sel => { s[sel.dataset.skill] = +sel.value; });
+  manualSkills = s;
+}
+function updateSkillEditorHeads() { /* запасная точка расширения */ }
+
+function resetManualEditors() {
+  manualAttrs = null; manualSkills = null;
+  refreshManualEditors();
 }
 
 function buildLPControls() {
@@ -502,20 +610,20 @@ function buildLPControls() {
   box.innerHTML = LP_STEPS.map(st => `
     <div class="lp-step" data-key="${st.key}">
       <div class="lp-step-label">${st.icon} ${st.label}</div>
-      <div class="lp-step-value"><span class="roll">—</span><span class="text muted">не брошено</span></div>
-      <button class="btn tiny" data-roll="${st.key}">Бросить d6</button>
+      <select class="lp-pick" data-pick="${st.key}" title="Выбрать вариант из таблицы"></select>
+      <button class="btn tiny" data-roll="${st.key}">🎲 Бросить d6</button>
     </div>`).join('');
+  // заполняем дропдауны вариантами таблиц жизненного пути (d6)
+  box.querySelectorAll('[data-pick]').forEach(sel => {
+    const key = sel.dataset.pick;
+    sel.innerHTML = `<option value="">— не брошено —</option>` +
+      CPR.LIFEPATH[key].map((t, i) => `<option value="${i + 1}">${i + 1}: ${t}</option>`).join('');
+    sel.onchange = () => setLpStep(key, sel.value ? +sel.value : null, false);
+  });
   box.querySelectorAll('[data-roll]').forEach(b => {
     b.onclick = () => {
       const key = b.dataset.roll;
-      const r = d(6);
-      const txt = CPR.LIFEPATH[key][r - 1];
-      const el = b.closest('.lp-step');
-      el.querySelector('.roll').textContent = `d6 = ${r}`;
-      el.querySelector('.text').textContent = txt;
-      el.classList.add('rolled');
-      window.__lp = window.__lp || {};
-      window.__lp[key] = { roll: r, text: txt };
+      setLpStep(key, d(6), true);
     };
   });
   $('#lp-all').onclick = () => {
@@ -523,14 +631,43 @@ function buildLPControls() {
   };
 }
 
+/* установить/бросить этап пути: roll=null сбрасывает этап */
+function setLpStep(key, roll, isRandom) {
+  const el = $(`#lp-steps .lp-step[data-key="${key}"]`);
+  window.__lp = window.__lp || {};
+  const sel = el.querySelector('[data-pick]');
+  if (roll == null) {
+    delete window.__lp[key];
+    sel.value = '';
+    el.classList.remove('rolled');
+    return;
+  }
+  const txt = CPR.LIFEPATH[key][roll - 1];
+  window.__lp[key] = { roll, text: txt };
+  sel.value = String(roll);
+  el.classList.add('rolled');
+  if (isRandom) toast(`d6 = ${roll}`);
+}
+
+function picksFromControls(panelMode) {
+  // собираем выбор пользователя из выпадающих списков активной панели
+  if (panelMode === 'random') {
+    return { role: $('#rnd-role').value, arch: $('#rnd-arch').value, bg: $('#rnd-bg').value };
+  }
+  if (panelMode === 'lifepath') {
+    return { role: $('#lp-role').value, arch: $('#lp-arch').value, bg: $('#lp-bg').value };
+  }
+  return null;
+}
+
 function generate() {
   if (mode === 'random') {
-    char = genRandom();
+    char = genRandom(Object.assign(picksFromControls('random'), { lifepath: window.__lp || {} }));
   } else if (mode === 'table') {
-    char = genTable($('#sel-role').value, $('#sel-arch').value, $('#sel-bg').value);
+    char = genTable($('#sel-role').value, $('#sel-arch').value, $('#sel-bg').value,
+      manualAttrs || undefined, manualSkills || undefined);
   } else {
-    const lp = rollLifePath(window.__lp || {});
-    char = genLifePath(lp);
+    char = genLifePath(window.__lp || {}, picksFromControls('lifepath'));
   }
   renderSheet();
   persistCurrent();
@@ -545,9 +682,12 @@ function generatePreset(key) {
   if (!p) return;
   char = genPreset(key);
   activePreset = key;
+  // пакет создан «под ключ» — ручной point-buy больше не активен
+  manualAttrs = null; manualSkills = null;
   $$('.preset-card').forEach(c => c.classList.toggle('active', c.dataset.preset === key));
   renderSheet();
   persistCurrent();
+  syncManualControls();
   toast('Вариант «' + p.name + '» создан');
 }
 
@@ -572,11 +712,27 @@ function reroll() { generate(); }
 /* синхронизация контролов с загруженным персонажем */
 function syncManualControls() {
   if (!char) return;
-  if (mode === 'table') {
-    $('#sel-role').value = char.role;
-    $('#sel-role').dispatchEvent(new Event('change'));
-    $('#sel-arch').value = char.archetype;
-    $('#sel-bg').value = char.background;
+  // панель «Ролевая таблица»
+  $('#sel-role').value = char.role;
+  $('#sel-role').dispatchEvent(new Event('change'));
+  $('#sel-arch').value = char.archetype;
+  $('#sel-bg').value = char.background;
+  refreshManualEditors();
+  // панели «Случайно» и «Жизненный путь»
+  $('#rnd-role').value = char.role;
+  $('#rnd-role').dispatchEvent(new Event('change'));
+  $('#rnd-arch').value = char.archetype;
+  $('#rnd-bg').value = char.background;
+  $('#lp-role').value = char.role;
+  $('#lp-role').dispatchEvent(new Event('change'));
+  $('#lp-arch').value = char.archetype;
+  $('#lp-bg').value = char.background;
+  // отражаем Жизненный путь персонажа в дропдаунах этапов
+  if (char.lifepath) {
+    LP_STEPS.forEach(st => {
+      const e = char.lifepath[st.key];
+      if (e && e.roll) setLpStep(st.key, e.roll, false);
+    });
   }
 }
 
@@ -595,7 +751,9 @@ function toast(msg) {
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   buildTableControls();
+  buildPickPanels();
   buildLPControls();
+  buildManualEditors();
   buildPresetControls();
   renderSavedList();
   switchMode('random');

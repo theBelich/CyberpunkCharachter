@@ -61,15 +61,20 @@ vm.createContext(sandbox);
 
 function run(file) {
   let code = fs.readFileSync(path.join(ROOT, file), 'utf8');
-  // в браузерном режиме скрипты делят один глоб scope; в vm-контексте
+  // в браузерном режиме скрипты делят один глобал-скоуп; в vm-контексте
   // top-level const не попадает в sandbox — оборачиваем и экспортируем вручную
   if (file === 'js/data.js')    code += '\n;globalThis.__X = { CPR };\n';
   if (file === 'js/xlsx-lite.js') code += '\n;globalThis.__X = { ...globalThis.__X, XLSXLite };\n';
-  if (file === 'js/app.js') code += '\n;globalThis.__X = { ...globalThis.__X, genPreset, genRandom, genTable, genLifePath, rollLifePath, xlsxSheets, makeCharacter, recomputeDerived };\n';
+  if (file === 'js/app.js') code += '\n;globalThis.__X = { ...globalThis.__X, genPreset, genRandom, genTable, genLifePath, rollLifePath, xlsxSheets, makeCharacter, recomputeDerived, LP_STEPS };\n';
   vm.runInContext(code, sandbox, { filename: file });
 }
 
-run('js/data.js');
+// таблицы вынесены в src/ — подключаем их так же, как index.html (before data.js)
+['src/attributes.js', 'src/skills.js', 'src/roles.js', 'src/backgrounds.js',
+ 'src/lifepath.js', 'src/gear.js', 'src/derived.js', 'src/presets.js']
+  .forEach(f => run(f));
+
+run('js/data.js');run('js/data.js');
 run('js/xlsx-lite.js');
 run('js/app.js');
 
@@ -144,6 +149,22 @@ console.log('\n== Базовые способы создания ==');
   ok(t.attrs.lu === 2, 'LU=2 при point-buy');
   const lp = genLifePath(rollLifePath({}));
   ok(lp.method === 'lifepath' && Object.keys(lp.lifepath).length === 6, '🛤 Жизненный путь: 6 этапов');
+}
+
+console.log('\n== Выбор данных из выпадающих списков (picks) ==');
+{
+  const r = genRandom({ role: 'medic', arch: 'chirurgeon', bg: 'boomer' });
+  ok(r.role === 'medic' && r.archetype === 'chirurgeon' && r.background === 'boomer',
+    '🎲 Случайно уважает выбор роль/архетип/происхождение');
+  ok(!!r.lifepath, '🎲 Случайно по-прежнему кидает Жизненный путь');
+  const lp = genLifePath(rollLifePath({}), { role: 'tinker', arch: 'inventor', bg: 'lantern' });
+  ok(lp.role === 'tinker' && lp.archetype === 'inventor' && lp.background === 'lantern',
+    '🛤 Жизненный путь уважает выбор');
+  const attrs = { cs: 5, cn: 5, co: 5, d4: 5, em: 5, ia: 5, lu: 2, ref: 6, re: 5, tech: 5 };
+  const skills = {}; CPR.SKILLS.forEach(s2 => skills[s2.key] = 0); skills.handguns = 7;
+  const t = genTable('solo', 'gunfighter', 'street', attrs, skills);
+  ok(t.attrs.ref === 6 && t.attrs.tech === 5, '📋 Ручные атрибуты применяются');
+  ok(t.skills.handguns === 7 && t.skills.rifles === 0, '📋 Ручные навыки применяются');
 }
 
 console.log('\n== Экспорт JSON ==');
