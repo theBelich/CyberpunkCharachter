@@ -98,9 +98,10 @@ function makeCharacter(opts = {}) {
     attrs, skills,
     budget: (arch.rolePoints || 0) + Object.values(arch.typePoints || {}).reduce((a, b) => a + b, 0) + 8 /* происхождение */,
     lifepath: opts.lifepath || null,
-    credits: bg.credits + 10 * d(10),
-    gear: (CPR.STARTGEAR[role.key] || []).concat(bg.items || []),
-    extras: arch.extras || [],
+    credits: opts.credits != null ? opts.credits : bg.credits + 10 * d(10),
+    gear: opts.gear || (CPR.STARTGEAR[role.key] || []).concat(bg.items || []),
+    extras: opts.extras || arch.extras || [],
+    preset: opts.preset || null,
     created: new Date().toISOString(),
     method: opts.method || 'table',
   };
@@ -159,6 +160,53 @@ function genLifePath(lpRolls) {
   const lp = rollLifePath(lpRolls);
   const c = makeCharacter({ method: 'lifepath', lifepath: lp });
   return c;
+}
+
+/* ---------- ГОТОВЫЕ ВАРИАНТЫ (пресеты): уличная крыса / эджраннер / полный пакет ---------- */
+function distributeTypePoints(skills, typePoints) {
+  // раздаёт оставшиеся очки типа случайно по категории (как baseSkills)
+  const byType = {};
+  CPR.SKILLS.forEach(s => (byType[s.type] = byType[s.type] || []).push(s.key));
+  Object.entries(typePoints || {}).forEach(([type, pts]) => {
+    let left = pts;
+    const pool = byType[type] || [];
+    while (left > 0 && pool.length) {
+      const k = pick(pool);
+      if (skills[k] < 10) { skills[k]++; left--; }
+    }
+  });
+  return skills;
+}
+
+function genPreset(key) {
+  const p = CPR.PRESETS.find(x => x.key === key);
+  if (!p) return null;
+
+  // «Полный пакет»: полная процедура книги игрока —
+  // случайные роль/архетип/происхождение, полные очки навыков и полный Жизненный путь на d6
+  if (p.fullLifePath) {
+    return makeCharacter({ method: 'preset', preset: p.key, lifepath: rollLifePath({}) });
+  }
+
+  const { role, arch } = findRoleArchetype(p.role, p.archetype);
+  const bg = CPR.BACKGROUNDS.find(b => b.key === p.background) || CPR.BACKGROUNDS[0];
+
+  // базовые навыки пакета + добор очков типа поверх них
+  const skills = {};
+  CPR.SKILLS.forEach(s => skills[s.key] = 0);
+  Object.entries(p.skills || {}).forEach(([k, v]) => { if (skills[k] !== undefined) skills[k] = v; });
+  distributeTypePoints(skills, p.typePoints);
+
+  return makeCharacter({
+    role, arch, bg,
+    attrs: p.attrs ? { ...p.attrs } : undefined,
+    skills,
+    gear: p.gear ? [...p.gear] : undefined,
+    extras: p.extras ? [...p.extras] : undefined,
+    credits: p.credits != null ? p.credits : undefined,
+    lifepath: p.lifepath ? rollLifePath({}) : null,
+    method: 'preset', preset: p.key,
+  });
 }
 
 /* ============================================================
@@ -235,7 +283,7 @@ function renderSheet() {
         </div>
         <div class="head-style">Стиль: ${char.meta.style} • Везучий: ${char.meta.lucky}</div>
       </div>
-      <div class="method-badge" title="Способ создания">${methodLabel(char.method)}</div>
+      <div class="method-badge" title="Способ создания">${creationLabel(char)}</div>
     </header>
 
     <section class="panel">
@@ -272,13 +320,22 @@ function renderSheet() {
 
     <footer class="sheet-foot">
       <span>Создан: ${new Date(char.created).toLocaleString('ru-RU')}</span>
-      <span>Метод: ${methodLabel(char.method)}</span>
+      <span>Метод: ${creationLabel(char)}</span>
     </footer>
   </article>`;
 }
 
 function methodLabel(m) {
   return m === 'random' ? '🎲 Случайно' : m === 'table' ? '📋 Ролевая таблица' : '🛤 Жизненный путь';
+}
+
+/* подпись варианта создания: пресет или базовый способ */
+function creationLabel(c) {
+  if (c.preset) {
+    const p = CPR.PRESETS.find(x => x.key === c.preset);
+    if (p) return `${p.icon} ${p.name}`;
+  }
+  return methodLabel(c.method);
 }
 
 /* ============================================================
@@ -477,7 +534,37 @@ function generate() {
   }
   renderSheet();
   persistCurrent();
-  toast('Персонаж создан (' + methodLabel(char.method) + ')');
+  toast('Персонаж создан (' + creationLabel(char) + ')');
+}
+
+/* ---------- генерация по готовому варианту (пресету) ---------- */
+let activePreset = null;
+
+function generatePreset(key) {
+  const p = CPR.PRESETS.find(x => x.key === key);
+  if (!p) return;
+  char = genPreset(key);
+  activePreset = key;
+  $$('.preset-card').forEach(c => c.classList.toggle('active', c.dataset.preset === key));
+  renderSheet();
+  persistCurrent();
+  toast('Вариант «' + p.name + '» создан');
+}
+
+function buildPresetControls() {
+  const box = $('#preset-list');
+  box.innerHTML = CPR.PRESETS.map(p => `
+    <button class="preset-card" data-preset="${p.key}" type="button">
+      <div class="preset-head">
+        <span class="preset-icon">${p.icon}</span>
+        <span class="preset-name">${p.name}</span>
+        <span class="preset-tagline">${p.tagline}</span>
+      </div>
+      <p class="preset-desc">${p.desc}</p>
+    </button>`).join('');
+  box.querySelectorAll('.preset-card').forEach(el => {
+    el.onclick = () => generatePreset(el.dataset.preset);
+  });
 }
 
 function reroll() { generate(); }
@@ -509,6 +596,7 @@ function toast(msg) {
 document.addEventListener('DOMContentLoaded', () => {
   buildTableControls();
   buildLPControls();
+  buildPresetControls();
   renderSavedList();
   switchMode('random');
   generate();
