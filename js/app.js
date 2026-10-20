@@ -36,12 +36,44 @@ function findRoleArchetype(roleKey, archKey) {
   return { role, arch };
 }
 
-/* Атрибуты по архетипу роли (ролевая таблица книги):
-   focus → 6 и 5; others → 4; LU → 2 */
+/* Атрибуты по архетипу роли (шаблоны Streetrat Templates, стр. 74–77).
+   В данных лежат средние значения колонок шаблона (вещественные числа);
+   здесь они округляются до целых с сохранением суммы (метод наибольших
+   остатков), а Удача поднимается минимум до 5 — как требует книга. */
+const ATTR_KEYS = ['cs','cn','co','d4','em','ia','ref','re','tech','lu'];
+function roundAttrsKeepingSum(src) {
+  const keys = Object.keys(src);
+  const target = Math.round(keys.reduce((s, k) => s + src[k], 0));
+  const base = {}, rem = [];
+  keys.forEach(k => {
+    base[k] = Math.floor(src[k]);
+    rem.push({ k, frac: src[k] - base[k] });
+  });
+  let left = target - keys.reduce((s, k) => s + base[k], 0);
+  rem.sort((x, y) => y.frac - x.frac || (x.k === 'lu' ? -1 : y.k === 'lu' ? 1 : 0));
+  for (let i = 0; left > 0 && i < rem.length; i++, left--) base[rem[i].k]++;
+  return base;
+}
 function attrsFromArchetype(arch) {
+  if (arch.attrs) {                       // данные из таблиц книги (roles.js)
+    const a = roundAttrsKeepingSum(arch.attrs);
+    if (a.lu < 5) {                       // правило COREBOOK: Luck ≥ 5
+      const donor = ATTR_KEYS.filter(k => k !== 'lu')
+        .sort((x, y) => a[y] - a[x] || ((src[y] ?? a[y]) - Math.ceil(src[y])) - ((src[x] ?? a[x]) - Math.ceil(src[x])))[0];
+      // забираем единицу у атрибута, чьё дробное значение ближе всех к полу
+      const byFrac = ATTR_KEYS.filter(k => k !== 'lu')
+        .sort((x, y) => (Math.ceil(arch.attrs[x]) - arch.attrs[x]) - (Math.ceil(arch.attrs[y]) - arch.attrs[y]));
+      const d = byFrac.find(k => a[k] > 2) || donor;
+      a[d]--; a.lu++;
+    }
+    const out = {};
+    ATTR_KEYS.forEach(k => out[k] = a[k] != null ? a[k] : 4);
+    return out;
+  }
+  // резервная схема point-buy (если у архетипа нет attrs)
   const a = {};
-  arch.focus.forEach((k, i) => a[k] = i === 0 ? 6 : 5);
-  arch.others.forEach(k => a[k] = k === 'lu' ? 2 : 4);
+  (arch.focus || []).forEach((k, i) => a[k] = i === 0 ? 6 : 5);
+  (arch.others || []).forEach(k => a[k] = k === 'lu' ? 2 : 4);
   return a;
 }
 
@@ -510,11 +542,12 @@ function buildTableControls() {
   }
   function showArchInfo() {
     const { role, arch } = findRoleArchetype(currentRole().key, archSel.value);
+    const def = attrsFromArchetype(arch);
+    const attrLine = CPR.ATTRS.map(a => `${a.abbr} ${def[a.key]}`).join(' · ');
     $('#arch-info').innerHTML = `
-      <p><b>${role.name} — ${arch.name}.</b> Ключевые атрибуты:
-      ${arch.focus.map(k => CPR.attrByKey(k).name).join(' и ')} → <b>6</b> и <b>5</b>;
-      остальные → <b>4</b>, Удача → <b>2</b>.</p>
-      <p class="muted small">Ролевые навыки: ${arch.skills.map(([k, v]) => `${CPR.skillByKey(k).name} +${v}`).join(', ') || '—'}.</p>
+      <p><b>${role.name} — ${arch.name}.</b>${role.ability ? ` Особость: <b>${role.ability}</b>.` : ''}</p>
+      <p class="muted small">Атрибуты шаблона роли (стр. 74–77): ${attrLine}.</p>
+      <p class="muted small">Ролевые навыки: ${(arch.skills || []).map(([k, v]) => `${(CPR.skillByKey(k) || {}).name || k} +${v}`).join(', ') || '—'}.</p>
       <p class="muted small">Очки навыков по категориям: ${Object.entries(arch.typePoints).map(([t, p]) => `${CPR.TYPE_LABELS[t]}: ${p}`).join('; ')}.</p>`;
   }
   // при смене роли/архетипа/происхождения — обновляем справку и ручные редакторы
