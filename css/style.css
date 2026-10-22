@@ -141,6 +141,8 @@ body {
 }
 .lp-step.rolled { border-color: rgba(252,238,10,.5); }
 .lp-step-label { color: var(--muted); margin-bottom: 4px; }
+.lp-step-label .dice-tag { color: var(--yellow); font-weight: 700; }
+.lp-step-label .roll { color: var(--cyan); font-weight: 700; }
 .lp-pick {
   width: 100%; margin: 2px 0 6px; padding: 7px 8px; border-radius: 9px;
   background: var(--panel); color: var(--text); border: 1px solid var(--line); font-size: 12px;
