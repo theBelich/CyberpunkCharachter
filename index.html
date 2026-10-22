@@ -222,6 +222,9 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js"></script>
+  <!-- Обычный (не module) скрипт: работает и по file://, и по http(s):// во всех браузерах.
+       Это бандл без ES-модулей; исходники — js/app.js, js/exporters.js, data/skills.js, src/roles/*.js.
+       После правки исходников пересоберите бандл: node tools/bundle.mjs -->
+  <script src="js/app-bundle.js" onerror="var t=document.getElementById('toast'); if(t){t.textContent='Не найден файл js/app-bundle.js — проверьте, что папка js лежит рядом с index.html';t.classList.add('show');}"></script>
 </body>
 </html>
