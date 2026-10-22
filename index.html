@@ -23,6 +23,18 @@
     </div>
   </header>
 
+  <!-- ===== Экспорт / импорт ===== -->
+  <section class="export-bar" aria-label="Экспорт и импорт персонажа">
+    <span class="export-label">Экспорт листа:</span>
+    <button class="btn tiny" id="btn-export-xlsx" type="button" title="Скачать лист персонажа в формате Excel (.xlsx)">⬇ .xlsx</button>
+    <button class="btn tiny" id="btn-export-pdf" type="button" title="Скачать лист персонажа в формате PDF (.pdf)">⬇ .pdf</button>
+    <button class="btn tiny" id="btn-export-json" type="button" title="Скачать данные персонажа в формате JSON (.json)">⬇ .json</button>
+    <span class="export-sep"></span>
+    <button class="btn tiny ghost" id="btn-import-json" type="button" title="Открыть персонажа из JSON-файла (или перетащите .json файл на страницу)">⬆ Импорт .json</button>
+    <input type="file" id="inp-import-file" accept=".json,application/json" class="hidden-file" aria-label="Файл персонажа JSON" />
+    <span class="muted small">Совет: для PDF с кириллицей и полным оформлением используйте «Печать» → «Сохранить как PDF».</span>
+  </section>
+
   <main class="layout">
     <!-- ===== Панель управления ===== -->
     <aside class="controls">

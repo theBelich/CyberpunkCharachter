@@ -19,6 +19,7 @@ import { exec } from "../src/roles/exec.js";
 import { media } from "../src/roles/media.js";
 import { lawman } from "../src/roles/lawman.js";
 import { SKILLS, SKILL_BY_NAME, SKILL_GROUPS } from "../data/skills.js";
+import { buildSheetData, exportJSON, exportXLSX, exportPDF, downloadBlob, parseImportedJSON } from "./exporters.js";
 
 const ROLES = [solo, netrunner, rockerboy, nomad, fixer, tech, medtech, exec, media, lawman];
 
@@ -395,6 +396,68 @@ function renderSaved() {
 }
 
 // ------------------------------------------------------------
+// Экспорт / импорт персонажа (.xlsx / .pdf / .json)
+// Работает полностью на стороне клиента; скачивание — Blob + <a download>,
+// с запасными путями для старых браузеров (msSaveBlob, data-URL).
+// ------------------------------------------------------------
+function fileBaseName(c) {
+  return ("cp-red-" + (c.name || "character") + "-" + (c.role || "")).replace(/[^\w\-]+/g, "_");
+}
+
+function doExport(fmt) {
+  if (!current) return toast("Сначала создайте или откройте персонажа!");
+  try {
+    let blob, ext = fmt;
+    if (fmt === "json") {
+      blob = exportJSON(current);
+    } else if (fmt === "xlsx") {
+      blob = exportXLSX(buildSheetData(current, {
+        STAT_RU,
+        skillRu: { nameOf: skillRu, statOf: skillStat, statName: (s) => STAT_RU[s] || s }
+      }));
+    } else if (fmt === "pdf") {
+      blob = exportPDF(current, { ROLE_RU, SKILL_BY_NAME });
+    }
+    if (!blob) return toast("Неизвестный формат экспорта");
+    downloadBlob(blob, `${fileBaseName(current)}.${ext}`);
+    toast(`Экспорт в .${ext} выполнен`);
+  } catch (e) {
+    console.error(e);
+    toast("Ошибка экспорта: " + (e?.message || e));
+  }
+}
+
+function importFromJSONFile(file) {
+  const finish = (c, msg) => {
+    current = c;
+    renderSheet(c);
+    toast(msg);
+  };
+  // Путь 1: FileReader — поддерживается всеми современными браузерами
+  if (typeof FileReader === "function") {
+    const r = new FileReader();
+    r.onload = () => {
+      try { finish(parseImportedJSON(String(r.result)), `Персонаж «${current.name}» импортирован из JSON`); }
+      catch (e) { toast("Ошибка импорта: " + e.message); }
+    };
+    r.onerror = () => toast("Не удалось прочитать файл");
+    r.readAsText(file, "utf-8");
+    return;
+  }
+  // Путь 2 (fallback для очень старых браузеров): input.value как data-URL
+  try {
+    const raw = String(file).split(",")[1];
+    const text = (window.atob && typeof JSON !== "undefined")
+      ? decodeURIComponent(escape(window.atob(raw)))
+      : null;
+    if (!text) throw new Error("Формат data-URL не распознан");
+    finish(parseImportedJSON(text), `Персонаж «${current.name}» импортирован из JSON`);
+  } catch (e) {
+    toast("Ошибка импорта: " + e.message);
+  }
+}
+
+// ------------------------------------------------------------
 // Toast
 // ------------------------------------------------------------
 let toastTimer = null;
@@ -473,6 +536,29 @@ function init() {
 
   $("btn-save").addEventListener("click", saveCharacter);
   $("btn-print").addEventListener("click", () => window.print());
+
+  // Экспорт в .xlsx / .pdf / .json
+  $("btn-export-xlsx")?.addEventListener("click", () => doExport("xlsx"));
+  $("btn-export-pdf")?.addEventListener("click", () => doExport("pdf"));
+  $("btn-export-json")?.addEventListener("click", () => doExport("json"));
+
+  // Импорт из .json (работает и как drag&drop файла на страницу)
+  const fileInput = $("inp-import-file");
+  $("btn-import-json")?.addEventListener("click", () => {
+    if (!fileInput) return;
+    fileInput.value = "";
+    fileInput.click();
+  });
+  fileInput?.addEventListener("change", () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (f) importFromJSONFile(f);
+  });
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer?.files?.[0];
+    if (f && (/\.json$/i.test(f.name) || f.type === "application/json")) importFromJSONFile(f);
+  });
 
   renderSaved();
   sel.dispatchEvent(new Event("change"));
