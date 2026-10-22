@@ -35,6 +35,28 @@
         <p class="arch-info" id="role-info">—</p>
       </section>
 
+      <!-- Данные персонажа: имя, возраст, стиль -->
+      <section class="mode-panel identity-panel">
+        <h2>Данные персонажа</h2>
+        <label>
+          Имя
+          <input type="text" id="inp-name" placeholder="Например: Ви" maxlength="40" />
+        </label>
+        <label>
+          Псевдоним (по желанию)
+          <input type="text" id="inp-nick" placeholder="Например: Призрак" maxlength="40" />
+        </label>
+        <label>
+          Возраст (15–80)
+          <input type="number" id="inp-age" min="15" max="80" step="1" placeholder="25" />
+        </label>
+        <label>
+          Стиль
+          <select id="sel-style" aria-label="Стиль персонажа"></select>
+        </label>
+        <p class="small muted">Если поля пустые — значения будут выбраны случайно.</p>
+      </section>
+
       <!-- Три способа создания — три кнопки -->
       <section class="presets">
         <h2 class="presets-title">Создать персонажа — 3 способа</h2>
@@ -146,8 +168,8 @@
             <h2>Навыки роли</h2>
             <div class="skills-wrap">
               <table class="skills">
-                <thead><tr><th>Навык</th><th>Ур.</th></tr></thead>
-                <tbody id="skills-body"><tr><td colspan="2" class="muted">Сначала создайте персонажа.</td></tr></tbody>
+                <thead><tr><th>Навык</th><th>Хар-ка</th><th>Ур.</th><th>Ур.+хар-ка</th></tr></thead>
+                <tbody id="skills-body"><tr><td colspan="4" class="muted">Сначала создайте персонажа.</td></tr></tbody>
               </table>
             </div>
           </div>
