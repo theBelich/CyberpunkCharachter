@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "name": "Безымянный",
+  "role": "",
+  "rank": "",
+  "specialAbility": "",
+  "stats": {
+    "INT": 6,
+    "REF": 6,
+    "MOVE": 6,
+    "DEX": 6,
+    "TECH": 6,
+    "COOL": 6,
+    "WILL": 6,
+    "BODY": 6,
+    "LUCK": 6,
+    "EMP": 6
+  },
+  "splitStats": {
+    "LUCK": {
+      "current": 6,
+      "max": 6
+    },
+    "EMP": {
+      "current": 6,
+      "max": 6
+    }
+  },
+  "health": {
+    "current": 0,
+    "max": 0,
+    "heavyInjury": "",
+    "deathSave": ""
+  },
+  "humanity": {
+    "current": 0,
+    "max": 0
+  },
+  "criticalInjuries": "",
+  "dependencies": "",
+  "armor": {
+    "head": {
+      "name": "",
+      "sp": 0,
+      "penalty": 0
+    },
+    "body": {
+      "name": "",
+      "sp": 0,
+      "penalty": 0
+    },
+    "shield": {
+      "name": "",
+      "sp": 0,
+      "penalty": 0
+    }
+  },
+  "weapons": [],
+  "gear": [
+    {
+      "id": "shellme-money",
+      "name": "Деньги (еб)",
+      "amount": "0",
+      "notes": ""
+    }
+  ],
+  "ammo": [],
+  "money": 0,
+  "cyberware": [],
+  "skills": {},
+  "subskills": {},
+  "customSkills": [],
+  "enemies": [],
+  "lifepath": {
+    "culture": "",
+    "personality": "",
+    "style": "",
+    "hair": "",
+    "value": "",
+    "people": "",
+    "closePerson": "",
+    "valuable": "",
+    "family": "",
+    "childhood": "",
+    "crisis": "",
+    "goal": "",
+    "home": "",
+    "rent": "",
+    "lifestyle": "",
+    "reputation": 0,
+    "reputationEvents": "",
+    "friends": "",
+    "tragicRomances": "",
+    "rolePath": ""
+  },
+  "cyberdeckVisible": true,
+  "cyberdeck": {
+    "name": "",
+    "notes": "",
+    "programs": [],
+    "equipment": []
+  }
+}
