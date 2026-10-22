@@ -416,7 +416,7 @@ function doExport(fmt) {
         skillRu: { nameOf: skillRu, statOf: skillStat, statName: (s) => STAT_RU[s] || s }
       }));
     } else if (fmt === "pdf") {
-      blob = exportPDF(current, { ROLE_RU, SKILL_BY_NAME });
+      blob = exportPDF(current, { ROLE_RU, STAT_RU, SKILL_BY_NAME, GROUP_RU });
     }
     if (!blob) return toast("Неизвестный формат экспорта");
     downloadBlob(blob, `${fileBaseName(current)}.${ext}`);

@@ -61,6 +61,9 @@ const skillsSrc = deModule(read("data/skills.js"));
 // ---------- [3] Экспортёры: js/exporters.js ----------
 const exportersSrc = deModule(read("js/exporters.js"));
 
+// ---------- [3a] Данные шрифтов PDF: js/pdf-fonts.js ----------
+const pdfFontsSrc = deModule(read("js/pdf-fonts.js"));
+
 // ---------- [4] Приложение: js/app.js ----------
 let appSrc = deModule(read("js/app.js"))
   // список ролей формируем из собранного ROLE_DATA вместо import'ов
@@ -102,12 +105,17 @@ ${roleChunks.join(",\n")}};
 ${skillsSrc.trim()}
 `,
   `/* ------------------------------------------------------------
-   [3] ЭКСПОРТ/ИМПОРТ — js/exporters.js (.xlsx / .pdf / .json)
+   [3] ШРИФТЫ PDF — js/pdf-fonts.js (генерируется tools/make_pdf_fonts.py)
+   ------------------------------------------------------------ */
+${pdfFontsSrc.trim()}
+`,
+  `/* ------------------------------------------------------------
+   [4] ЭКСПОРТ/ИМПОРТ — js/exporters.js (.xlsx / .pdf / .json)
    ------------------------------------------------------------ */
 ${exportersSrc.trim()}
 `,
   `/* ------------------------------------------------------------
-   [4] ПРИЛОЖЕНИЕ — js/app.js (генерация, отрисовка, UI)
+   [5] ПРИЛОЖЕНИЕ — js/app.js (генерация, отрисовка, UI)
    ------------------------------------------------------------ */
 ${appSrc.trim()}
 `].join("\n");
