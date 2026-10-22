@@ -173,6 +173,23 @@
         </div>
 
         <div class="panel">
+          <!-- Ролевая способность (Role Ability) — описание из книги игрока
+               (Core Rulebook, стр. 144–163). Размещена над характеристиками,
+               сразу под именем и ролью. Клик по заголовку сворачивает/разворачивает текст. -->
+          <section class="role-ability" id="role-ability">
+            <button type="button" class="role-ability-head collapsed-toggle" id="role-ability-toggle"
+                    aria-expanded="true" aria-controls="ra-text" title="Свернуть / развернуть описание способности">
+              <span class="role-ability-icon">🧠</span>
+              <span class="role-ability-titles">
+                <span class="role-ability-kicker">Ролевая способность · Core Rulebook, стр. <b id="ra-page">—</b></span>
+                <span class="role-ability-name" id="ra-name">—</span>
+                <span class="role-ability-en" id="ra-en"></span>
+              </span>
+              <span class="collapse-arrow" aria-hidden="true">▾</span>
+            </button>
+            <p class="role-ability-text" id="ra-text">Создайте персонажа — здесь появится описание ролевой способности из книги игрока.</p>
+          </section>
+
           <h2>Характеристики (STAT Block)</h2>
           <p class="muted small">Значения можно менять: введите число (1–10) или нажмите «−» / «+» — производные и навыки пересчитаются автоматически.</p>
           <div class="stats-grid" id="stats-grid"></div>
@@ -189,12 +206,12 @@
 
         <div class="panel two-col">
           <div>
-            <h2>Навыки (все навыки игры; навыки роли отмечены уровнем)</h2>
+            <!-- Контейнер групп умений: раньше это был <table>, теперь — сетка скруглённых карточек -->
+            <h2>Умения (навыки) — по группам; клик по названию группы скрывает её содержимое</h2>
             <div class="skills-wrap">
-              <table class="skills">
-                <thead><tr><th>Навык</th><th>Хар-ка</th><th>Ур.</th><th>Ур.+хар-ка</th></tr></thead>
-                <tbody id="skills-body"><tr><td colspan="4" class="muted">Сначала создайте персонажа.</td></tr></tbody>
-              </table>
+              <div id="skills-body" class="skill-groups">
+                <p class="muted small">Сначала создайте персонажа.</p>
+              </div>
             </div>
           </div>
           <div>

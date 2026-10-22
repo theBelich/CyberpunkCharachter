@@ -55,8 +55,9 @@ const roleChunks = ROLE_FILES.map((r) => {
   return `  ${r}: ${objText.slice(0, end)}`;
 });
 
-// ---------- [2] Навыки: data/skills.js ----------
-const skillsSrc = deModule(read("data/skills.js"));
+// ---------- [2] Навыки: data/skills.js + способности ролей: data/role-abilities.js ----------
+const skillsSrc = deModule(read("data/skills.js"))
+  + "\n\n" + deModule(read("data/role-abilities.js"));
 
 // ---------- [3] Экспортёры: js/exporters.js ----------
 const exportersSrc = deModule(read("js/exporters.js"));

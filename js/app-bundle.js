@@ -390,6 +390,79 @@ const SKILL_GROUPS = SKILLS.reduce((acc, s) => {
   return acc;
 }, {});
 
+
+// ============================================================
+// РОЛЕВЫЕ СПОСОБНОСТИ (Role Abilities) — Cyberpunk RED
+// Источник: Data/Cyberpunk Red Core Rulebook v1.25.pdf,
+// раздел «Getting It Done» — роли и их способности (стр. 144–163).
+// name / nameEn — название способности по книге;
+// text — перевод описания способности из книги игрока;
+// page — страница печатного издания (для сноски на листе).
+// ============================================================
+
+const ROLE_ABILITIES = {
+  Solo: {
+    name: "Боевое чутьё",
+    nameEn: "Combat Awareness",
+    page: "146",
+    text: "Способность роли Соло. Когда начинается бой (до броска Инициативы), в любое время вне боя или действием в бою Соло может распределить очки своей способности «Боевое чутьё» между приёмами: Защита от урона (уменьшает первый полученный урон раунда), Исключение промаха (игнорирует критические провалы при атаке), Реакция инициативы (+1 к броскам Инициативы за очко), Точная атака (бонус к точности атак) и Поиск слабости (замечает уязвимые места противника). Если Соло не меняет распределение, прежние значения сохраняются."
+  },
+  Netrunner: {
+    name: "Интерфейс",
+    nameEn: "Interface",
+    page: "147",
+    text: "Способность роли Нетраннера. «Интерфейс» позволяет работать в Сети: ранг способности определяет количество сетевых действий (NET Actions) за ход (ранги 1–3 — 2 действия, 4–6 — 3, 7–9 — 4, 10 — 5) и открывает набор умений Интерфейса: Чёрный ход (взлом паролей и защит Архитектуры), Маскировка (скрыть свои действия до выхода), Управление (контроль подключённых к Архитектуре систем), Ай-Ди (узнать, что найденные данные собой представляют и сколько стоят), Проводник (получить «карту» Архитектуры), Сканер (найти расположение систем в зоне), Скольжение (уйти от преследующего Чёрного ЛЁДА), Вирус (заложить вирус в ядре Архитектуры), Разряд (Zap) — базовая атака нетраннера против программ и других нетраннеров."
+  },
+  Rockerboy: {
+    name: "Харизматическое воздействие",
+    nameEn: "Charismatic Impact",
+    page: "144",
+    text: "Способность роли Рокербоя. Рокербой влияет на людей одной силой личности — это может быть музыка, поэзия, искусство, танец или просто физическое присутствие (рокер или вождь культа). Воздействие работает только на Поклонников (Fans): вне боя можно превратить незнакомого человека в поклонника броском Харизматического воздействия + 1d10 против СЛ 8 для одного человека, СЛ 10 для небольшой группы (до 6) или СЛ 12 для большой толпы. Ранг способности определяет площадки, где вы можете выступать, и силу влияния на поклонников — от маленькой услуги («купи выпить») до фанатов, готовых рисковать ради вас."
+  },
+  Nomad: {
+    name: "Мото",
+    nameEn: "Moto",
+    page: "161",
+    text: "Способность роли Кочевника. Главное отличие кочевника от остальных — у него лучше машины. «Мото» даёт Кочевнику доступ к транспорту пака и умение обращаться с ним: с ростом ранга способности персонаж получает новые средства передвижения (от мотоцикла и бронированного фургона до грузовиков, боевой техники и вертолётов) и всё лучше ими управляет. При повышении ранга роли Кочевник выбирает: получить новое транспортное средство бесплатно (или почти бесплатно) либо усилить навыки вождения и обслуживания техники."
+  },
+  Fixer: {
+    name: "Оператор",
+    nameEn: "Operator",
+    page: "159",
+    text: "Способность роли Фиксера. Фиксеры знают, как достать что угодно на чёрном рынке, и умеют договариваться с кем угодно. «Оператор» даёт Фиксеру связи и контакты: чем выше ранг, тем более редкие, дорогие и нелегальные товары он может найти, тем более серьёзных людей обязан ему услуга́ми и тем выгоднее сделки проходит через него. Способность также позволяет получать долю с сделок, которые вы устраиваете между другими сторонами."
+  },
+  Tech: {
+    name: "Мастер",
+    nameEn: "Maker",
+    page: "147",
+    text: "Способность роли Технаря. Тех может чинить, улучшать, модифицировать, создавать и изобретать новые предметы. При каждом повышении ранга «Мастера» Тех получает 1 очко в двух специальных направлениях на выбор: Полевая экспертиза (быстрый ремонт и импровизация в поле), Экспертиза улучшений (апгрейды предметов), Экспертиза производства (изготовление предметов с нуля) и Экспертиза изобретений (создание совершенно новых устройств). Проверки делаются TECH + соответствующий навык TECH-группы + ранг специализации + 1d10 против СЛ, зависящей от ценовой категории предмета."
+  },
+  Medtech: {
+    name: "Медицина",
+    nameEn: "Medicine",
+    page: "149",
+    text: "Способность роли Медтехника. Медтехники держат живыми тех, кто должен быть мёртв, — в Время Краски они скорее механики, чем врачи, ведь пациенты часто больше машина, чем человек. При повышении ранга «Медицины» Медтехник распределяет очки между тремя специализациями: Хирургия (каждое очко даёт +2 к навыку Хирургии; лечение тяжелейших критических ранений, имплантация киберимплантов), Фармацевтика (создание и применение медицинских препаратов — Stim, Speedheal, Antibiotic и др.) и Криосистемы (эксплуатация крионных установок). Навыки Хирургия и Медицинская техника доступны только Медтехникам через эту способность."
+  },
+  Exec: {
+    name: "Командная работа",
+    nameEn: "Teamwork",
+    page: "153",
+    text: "Способность роли Корпората. Как и настоящий корпоративный руководитель, Корпорат собирает команду, которая помогает ему достигать целей — законных или нет, насколько позволяет мораль. На ранге 1 «Командной работы» Корпорат получает подписной бонус: костюм Businesswear (пиджак, верх, низ и обувь), обозначающий элиту бизнеса, а также доступ к ресурсам компании: персоналу, информации, транспорту и влиянию внутри корпорации. Рост ранга увеличивает число и качество подчинённых и расширяет привилегии — вплоть до особняка в Executive Zone или пентхауса в Корпоративном зале."
+  },
+  Media: {
+    name: "Кредит доверия",
+    nameEn: "Credibility",
+    page: "151",
+    text: "Способность роли Журналиста. Журналист не только убеждает аудиторию в том, что публикует, — чем выше его кредит доверия, тем шире аудитория и доступ к источникам. Медиа также «в курсе всего» и пассивно ловит слухи: если вы не полностью офлайн, минимум дважды в неделю ГМ тайно бросает Кредит доверия + 1d10, и если проверка превышает СЛ из таблицы слухов, журналист получает самый ценный из доступных слухов. Ранг способности определяет аудиторию, убедительность материалов и масштаб последствий ваших публикаций — от локальных сплетен до падения мегакорпораций."
+  },
+  Lawman: {
+    name: "Подкрепление",
+    nameEn: "Backup",
+    page: "158",
+    text: "Способность роли Законника. У Законников есть то, чего нет у остальных обитателей Найт-Сити, — коллеги с жетонами. «Подкрепление» позволяет звать на помощь отряд служивых: чем выше ранг способности, тем быстрее, многочисленнее и лучше вооружён прибывший отряд (от патруля с пистолетами до спецназа SWAT, бронетехники и авиации). Законник также пользуется служебными полномочиями: доступом к базам данных, ордерами и уважением (или страхом) гражданских."
+  }
+};
+
 /* ------------------------------------------------------------
    [3] ШРИФТЫ PDF — js/pdf-fonts.js (генерируется tools/make_pdf_fonts.py)
    ------------------------------------------------------------ */
@@ -2203,6 +2276,42 @@ function applyStatChange(key, rawValue) {
 }
 
 // ------------------------------------------------------------
+// Ролевая способность (Role Ability) — блок над характеристиками,
+// сразу под именем и ролью. Текст берётся из data/role-abilities.js
+// (перевод описаний из книги игрока, Core Rulebook, стр. 144–163).
+// Клик по заголовку сворачивает/разворачивает описание; состояние
+// хранится в localStorage, чтобы блок оставался скрытым между листами.
+// ------------------------------------------------------------
+const RA_LS_KEY = "cp-red-role-ability-collapsed";
+
+function renderRoleAbility(c) {
+  const ab = ROLE_ABILITIES[c.role] || null;
+  const box = $("role-ability");
+  if (!box) return;
+  const nameEl = $("ra-name"), enEl = $("ra-en"),
+        pageEl = $("ra-page"), textEl = $("ra-text"),
+        toggle = $("role-ability-toggle");
+  if (!ab) {
+    nameEl.textContent = "—";
+    enEl.textContent = "";
+    pageEl.textContent = "—";
+    textEl.textContent = "Создайте персонажа — здесь появится описание ролевой способности из книги игрока.";
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  nameEl.textContent = `${ab.name} · ${c.roleRu}`;
+  enEl.textContent = `(${ab.nameEn})`;
+  pageEl.textContent = ab.page;
+  textEl.textContent = ab.text;
+  // состояние свёрнутости не теряется при перерисовке листа
+  const collapsed = localStorage.getItem(RA_LS_KEY) === "1";
+  textEl.classList.toggle("collapsed", collapsed);
+  box.classList.toggle("is-collapsed", collapsed);
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+}
+
+// ------------------------------------------------------------
 // Отрисовка листа
 // ------------------------------------------------------------
 function renderSheet(c) {
@@ -2212,6 +2321,10 @@ function renderSheet(c) {
   $("ch-age").textContent = c.age + " лет";
   $("ch-style").textContent = c.style;
   $("ch-method").textContent = c.methodName;
+
+  // Ролевая способность — описание из книги игрока (Core Rulebook, стр. 144–163).
+  // Блок находится над характеристиками, сразу под именем и ролью.
+  renderRoleAbility(c);
 
   // Характеристики — редактируемые числовые поля (1–10). Значение хранится в
   // data-value, чтобы при пустом поле кнопки «−» / «+» отталкивались от него.
@@ -2274,24 +2387,41 @@ function renderSheet(c) {
 }
 
 // ------------------------------------------------------------
-// Таблица навыков: название | характеристика | редактируемый уровень | сумма (уровень + характеристика)
+// Умения (навыки) персонажа — сетка карточек по группам навыков
+// (Core Rulebook, стр. 82–85). Общие группировки сохранены:
+// «Восприятие / Тело / Управление / Образование / Бой / Выступление /
+// Стрельба / Социальные / Техника». Каждая группа — скруглённый
+// прямоугольник-карточка; внутри — скруглённые квадратики умений
+// (название | хар-ка | уровень | бонус ур.+хар-ка). Заголовок группы
+// кликабельный — содержимое группы можно скрыть (состояние хранится
+// в localStorage и применяется к любой перерисовке таблицы).
 // ------------------------------------------------------------
 const SKILL_MIN = 0, SKILL_MAX = 10;
+const SG_LS_KEY = "cp-red-skill-groups-collapsed";
 
-function skillRowHtml(s, i, c) {
+// множество свёрнутых групп навыков + сохранение состояния
+let collapsedGroups = new Set();
+try { collapsedGroups = new Set(JSON.parse(localStorage.getItem(SG_LS_KEY) || "[]")); } catch { /* пусто */ }
+function saveCollapsedGroups() {
+  try { localStorage.setItem(SG_LS_KEY, JSON.stringify([...collapsedGroups])); } catch { /* приватный режим */ }
+}
+
+// Одна карточка умения: название, тег характеристики, редактируемый уровень, сумма
+function skillCardHtml(s, i, c) {
   const stat = skillStat(s.name);
   const statVal = c.stats[stat];
   const sum = (typeof statVal === "number" ? statVal : 0) + s.level;
   return `
-    <tr class="${s.level === 0 ? "zero" : ""}" data-skill="${i}">
-      <td>${skillRu(s.name)}</td>
-      <td class="attr-tag" title="${STAT_RU[stat] || stat}">${stat}</td>
-      <td class="lvl">
+    <div class="skill-chip${s.level === 0 ? " zero" : ""}" data-skill="${i}"
+         title="${skillRu(s.name)} · ${STAT_RU[stat] || stat}">
+      <span class="chip-name">${skillRu(s.name)}</span>
+      <span class="chip-row">
+        <span class="attr-tag" title="Характеристика проверки: ${STAT_RU[stat] || stat}">${stat}</span>
         <input type="number" class="lvl-input" min="${SKILL_MIN}" max="${SKILL_MAX}" step="1"
                value="${s.level}" aria-label="Уровень навыка: ${skillRu(s.name)}" />
-      </td>
-      <td class="mod">${sum}</td>
-    </tr>`;
+        <span class="chip-sum" title="Уровень + характеристика">${sum}</span>
+      </span>
+    </div>`;
 }
 
 function renderSkillsTable(c) {
@@ -2302,24 +2432,57 @@ function renderSkillsTable(c) {
   // не терялись и уровень правился у нужного навыка. Сортировка
   // «по убыванию уровня» — только визуальная (стабильная).
   const rows = c.skills.map((s, i) => ({ s, i })).sort((a, b) => b.s.level - a.s.level || a.i - b.i);
-  // Группируем отсортированные строки по категориям навыков (Core Rulebook, стр. 82–85)
+  // Группируем отсортированные строки по категориям навыков (общие группировки книги)
   const byGroup = new Map();
   for (const r of rows) {
     const g = SKILL_BY_NAME[r.s.name]?.group || "Прочее";
     if (!byGroup.has(g)) byGroup.set(g, []);
     byGroup.get(g).push(r);
   }
-  body.innerHTML = [...byGroup.entries()]
-    .map(([g, list]) =>
-      `<tr class="skill-group"><td colspan="4">${GROUP_RU[g] || g} <span class="cnt">(${list.length})</span></td></tr>` +
-      list.map(({ s, i }) => skillRowHtml(s, i, c)).join("")
-    )
+  // порядок групп — как в справочнике книги (GROUP_RU), неизвестные — в конце
+  const groupOrder = Object.keys(GROUP_RU);
+  const orderIdx = (g) => { const i = groupOrder.indexOf(g); return i === -1 ? 999 : i; };
+  const ordered = [...byGroup.entries()].sort((a, b) => orderIdx(a[0]) - orderIdx(b[0]));
+
+  body.innerHTML = ordered
+    .map(([g, list]) => {
+      const ru = GROUP_RU[g] || g;
+      const isCollapsed = collapsedGroups.has(g);
+      const top = list.filter(({ s }) => s.level > 0).slice(0, 3)
+        .map(({ s }) => `${skillRu(s.name)} (${s.level})`).join(", ");
+      return `
+      <section class="skill-group-card${isCollapsed ? " collapsed" : ""}" data-group="${g}">
+        <button type="button" class="skill-group-head" aria-expanded="${!isCollapsed}"
+                title="Скрыть / показать содержимое группы «${ru}»">
+          <span class="sg-title">${ru}</span>
+          <span class="cnt">(${list.length})</span>
+          <span class="sg-preview">${top}</span>
+          <span class="collapse-arrow" aria-hidden="true">▾</span>
+        </button>
+        <div class="skill-grid">
+          ${list.map(({ s, i }) => skillCardHtml(s, i, c)).join("")}
+        </div>
+      </section>`;
+    })
     .join("");
+
+  // заголовки групп: клик скрывает/показывает содержимое группы
+  body.querySelectorAll(".skill-group-head").forEach((head) => {
+    head.addEventListener("click", () => {
+      const card = head.closest(".skill-group-card");
+      const g = card.dataset.group;
+      const nowCollapsed = !card.classList.contains("collapsed");
+      card.classList.toggle("collapsed", nowCollapsed);
+      head.setAttribute("aria-expanded", String(!nowCollapsed));
+      if (nowCollapsed) collapsedGroups.add(g); else collapsedGroups.delete(g);
+      saveCollapsedGroups();
+    });
+  });
 
   // при изменении уровня — обновляем данные персонажа и пересобираем таблицу
   body.querySelectorAll("input.lvl-input").forEach((inp) => {
     inp.addEventListener("change", () => {
-      const idx = Number(inp.closest("tr").dataset.skill);
+      const idx = Number(inp.closest("[data-skill]").dataset.skill);
       let v = Math.round(Number(inp.value));
       if (!Number.isFinite(v)) v = SKILL_MIN;
       v = Math.max(SKILL_MIN, Math.min(SKILL_MAX, v));
@@ -2327,6 +2490,8 @@ function renderSkillsTable(c) {
       inp.value = v;
       renderSkillsTable(current);
     });
+    // клик по полю ввода не должен «просвечивать» в заголовок группы
+    inp.addEventListener("click", (e) => e.stopPropagation());
   });
 }
 
@@ -2593,6 +2758,18 @@ function init() {
   // Жизненный путь: сгенерировать случайно / выбрать вручную
   $("btn-lp-roll")?.addEventListener("click", generateLifepath);
   $("btn-lp-pick")?.addEventListener("click", () => toggleLpEditor());
+
+  // Ролевая способность: клик по заголовку скрывает/показывает описание
+  // (состояние запоминается в localStorage — см. renderRoleAbility)
+  $("role-ability-toggle")?.addEventListener("click", () => {
+    const box = $("role-ability"), textEl = $("ra-text");
+    if (!box || !textEl || box.classList.contains("hidden")) return;
+    const collapsed = !textEl.classList.contains("collapsed");
+    textEl.classList.toggle("collapsed", collapsed);
+    box.classList.toggle("is-collapsed", collapsed);
+    $("role-ability-toggle").setAttribute("aria-expanded", String(!collapsed));
+    try { localStorage.setItem(RA_LS_KEY, collapsed ? "1" : "0"); } catch { /* приватный режим */ }
+  });
 }
 
 // Если DOM уже готов — запускаем сразу; иначе ждём DOMContentLoaded
