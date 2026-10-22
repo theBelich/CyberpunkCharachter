@@ -1788,6 +1788,8 @@ function createCharacter(method, opts = {}) {
     style: id.style || pick(STYLES),
     stats: gen.stats,
     statsOrder: roleData.statsOrder,
+    baseNote: gen.note,
+    statEdits: 0,
     hp: calcHP(gen.stats.BODY, gen.stats.WILL),
     hum: gen.stats.EMP * 10,
     skills: buildFullSkillList(rollSkills(roleData)),
@@ -1802,6 +1804,34 @@ function createCharacter(method, opts = {}) {
 }
 
 // ------------------------------------------------------------
+// Редактирование характеристик прямо на листе
+// Значение каждой характеристики — числовое поле (1–10, как в Cyberpunk RED).
+// При изменении пересчитываются производные (HP, Смерть/ранение, HUM, MOVE),
+// обновляются суммы «уровень + характеристика» в таблице навыков и note о
+// ручной правке.
+// ------------------------------------------------------------
+const STAT_MIN = 1, STAT_MAX = 10;
+
+function applyStatChange(key, rawValue) {
+  if (!current) return;
+  let v = Math.round(Number(rawValue));
+  if (!Number.isFinite(v)) v = current.stats[key];            // некорректный ввод — оставляем стартовое значение
+  const clamped = Math.max(STAT_MIN, Math.min(STAT_MAX, v));
+  current.stats[key] = clamped;
+
+  // пересчёт производных величин
+  current.hp = calcHP(current.stats.BODY, current.stats.WILL);
+  current.hum = current.stats.EMP * 10;
+
+  const baseNote = (current.baseNote ??= current.note || "");
+  const edits = (current.statEdits = (current.statEdits || 0) + 1);
+  current.note = `${baseNote} · вручную изменено характеристик: ${edits}`;
+
+  renderSheet(current);
+  toast(`${key} (${STAT_RU[key] || key}) = ${clamped}`);
+}
+
+// ------------------------------------------------------------
 // Отрисовка листа
 // ------------------------------------------------------------
 function renderSheet(c) {
@@ -1812,14 +1842,40 @@ function renderSheet(c) {
   $("ch-style").textContent = c.style;
   $("ch-method").textContent = c.methodName;
 
+  // Характеристики — редактируемые числовые поля (1–10). Значение хранится в
+  // data-value, чтобы при пустом поле кнопки «−» / «+» отталкивались от него.
   $("stats-grid").innerHTML = c.statsOrder
     .map((k) => `
       <div class="stat">
         <div class="stat-abbr">${k}</div>
-        <div class="stat-val">${c.stats[k]}</div>
+        <div class="stat-val stat-edit">
+          <button type="button" class="stat-step dec" data-stat="${k}" data-delta="-1"
+                  aria-label="Уменьшить ${STAT_RU[k] || k}">−</button>
+          <input type="number" class="stat-input" data-stat="${k}" min="${STAT_MIN}" max="${STAT_MAX}" step="1"
+                 value="${c.stats[k]}" data-value="${c.stats[k]}"
+                 aria-label="${STAT_RU[k] || k} (${k})" title="Можно изменить: введите число или нажмите − / +" />
+          <button type="button" class="stat-step inc" data-stat="${k}" data-delta="1"
+                  aria-label="Увеличить ${STAT_RU[k] || k}">+</button>
+        </div>
         <div class="stat-name">${STAT_RU[k] || k}</div>
       </div>`)
     .join("");
+
+  const onStatEdit = (inp) => {
+    applyStatChange(inp.dataset.stat, inp.value);
+  };
+  $("stats-grid").querySelectorAll("input.stat-input").forEach((inp) => {
+    inp.addEventListener("change", () => onStatEdit(inp));
+    // Enter применяет значение и убирает фокус (страница не перезагружается)
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
+  });
+  $("stats-grid").querySelectorAll("button.stat-step").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const inp = $(`stats-grid`).querySelector(`input.stat-input[data-stat="${btn.dataset.stat}"]`);
+      const base = Number(inp?.dataset.value ?? current?.stats[btn.dataset.stat] ?? STAT_MIN);
+      applyStatChange(btn.dataset.stat, base + Number(btn.dataset.delta));
+    });
+  });
 
   $("d-hp").textContent = `${c.hp} / ${c.hp}`;
   $("d-sw").textContent = Math.ceil(c.hp / 2);
@@ -2117,9 +2173,11 @@ function init() {
     if (used !== total) return toast(`Используйте ровно ${total} очков (сейчас ${used})`);
     if (!current) return toast("Сначала создайте персонажа способом №3");
     current.stats = { ...buyStats };
+    current.baseNote = `«Полный пакет»: очки распределены вручную (${total} очков)`;
+    current.statEdits = 0;
     current.hp = calcHP(buyStats.BODY, buyStats.WILL);
     current.hum = buyStats.EMP * 10;
-    current.note = `«Полный пакет»: очки распределены вручную (${total} очков)`;
+    current.note = current.baseNote;
     renderSheet(current); // пересобираем лист, включая сумму «уровень + характеристика» у навыков
     toast("Характеристики обновлены");
   });
