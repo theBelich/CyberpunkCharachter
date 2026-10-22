@@ -121,8 +121,22 @@ export function buildSheetData(c, dict) {
     gear: c.gear.filter((g) => !isImplantGear(g)).map(gearLabel),
     // Импланты — отдельный список (киберимпланты из магазина)
     implants: c.gear.filter(isImplantGear).map(gearLabel),
+    // Активные оружие и броня (только по одному; SP/урон — свои значения или из книги)
+    loadout: buildLoadout(c),
     note: c.note
   };
+}
+
+// Строка экипировки для экспорта: «Название — SP N» / «Название — урон Nd6»
+function buildLoadout(c) {
+  const rows = [];
+  const w = (c.gear || []).find((g) => g && typeof g === "object" && g.weapon && g.active)
+    || (c.gear || []).find((g) => g && typeof g === "object" && g.weapon);
+  const a = (c.gear || []).find((g) => g && typeof g === "object" && g.armor && g.active)
+    || (c.gear || []).find((g) => g && typeof g === "object" && g.armor);
+  if (w) rows.push(`Активное оружие: ${gearLabel(w)}${w.damage ? ` — урон ${w.damage}` : ""}`);
+  if (a) rows.push(`Активная броня: ${gearLabel(a)}${Number.isFinite(Number(a.sp)) ? ` — SP ${a.sp}` : ""}`);
+  return rows;
 }
 
 // Киберимплант в инвентаре: объект с флагом implant:true (ставится при
@@ -220,7 +234,8 @@ export function exportXLSX(data) {
     S("Навыки", [["Навык", "Хар-ка", "Название хар-ки", "Уровень", "Ур.+хар-ка"], ...data.skills]),
     S("Жизненный путь", [["Пункт", "Значение"], ...data.lifepath]),
     S("Снаряжение", [["Предмет"], ...data.gear.map((g) => [g])]),
-    S("Импланты", [["Имплант"], ...(data.implants || []).map((g) => [g])])
+    S("Импланты", [["Имплант"], ...(data.implants || []).map((g) => [g])]),
+    S("Экипировка", [["Активные оружие и броня"], ...(data.loadout || []).map((r) => [r])])
   ];
 
   const wbSheets = sheets.map((s, i) =>
@@ -735,6 +750,19 @@ export function exportPDF(c, dict) {
         y -= 12;
       });
       y -= 2;
+    }
+  }
+
+  // ---- Экипировка: активное оружие (урон) и активная броня (SP) ----
+  {
+    const actW = (c.gear || []).find((g) => g && typeof g === "object" && g.weapon && g.active)
+      || (c.gear || []).find((g) => g && typeof g === "object" && g.weapon);
+    const actA = (c.gear || []).find((g) => g && typeof g === "object" && g.armor && g.active)
+      || (c.gear || []).find((g) => g && typeof g === "object" && g.armor);
+    if (actW || actA) {
+      section("Экипировка", CP.yellow);
+      if (actW) kv("Активное оружие:", `${String(gearLabel(actW))}${actW.damage ? ` — урон ${actW.damage}` : ""}`, { color: CP.text });
+      if (actA) kv("Активная броня:", `${String(gearLabel(actA))}${Number.isFinite(Number(actA.sp)) ? ` — SP ${actA.sp}` : ""}`, { color: CP.text });
     }
   }
 

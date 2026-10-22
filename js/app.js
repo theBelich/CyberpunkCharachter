@@ -24,6 +24,9 @@ import { buildSheetData, exportJSON, exportXLSX, exportPDF, downloadBlob, parseI
 // Каталог киберимплантов (данные PDF-таблиц) — используется для распознавания
 // имплантов в инвентаре (список «Импланты») и для магазина.
 import { CYBERWARE } from "../src/shops/cyberware.js";
+// Каталог оружия и брони (Core Rulebook, стр. 340–350) — источник данных
+// для выбора активного оружия / активной брони и справочных SP и урона.
+import { WEAPONS } from "../src/shops/weapons.js";
 
 const ROLES = [solo, netrunner, rockerboy, nomad, fixer, tech, medtech, exec, media, lawman];
 
@@ -730,7 +733,10 @@ function renderSheet(c) {
     const label = isObj ? g.name : g;
     const price = isObj && Number(g.cost) > 0
       ? ` <b class="gear-cost">(${Number(g.cost).toLocaleString("ru-RU")} eb)</b>` : "";
-    return `<li>${label}${price}</li>`;
+    // пометка активного предмета (только одно оружие и одна броня могут быть активны)
+    const activeTag = isObj && g.active
+      ? ` <b class="gear-active-tag">${g.weapon ? "⚔️ активно" : g.armor ? "🛡️ активна" : "★ активно"}</b>` : "";
+    return `<li>${label}${price}${activeTag}</li>`;
   };
   const implants = c.gear.filter(isImplantGear);
   const otherGear = c.gear.filter((g) => !isImplantGear(g));
@@ -743,6 +749,7 @@ function renderSheet(c) {
     $("implants-count").textContent = `(${implants.length})`;
     $("implants-list").innerHTML = implants.map(gearItemHtml).join("");
   }
+  renderLoadout(c); // активное оружие / активная броня (панель «Экипировка»)
   $("ch-cash").textContent = c.cash.toLocaleString("ru-RU") + " эдди";
 }
 
@@ -1116,6 +1123,17 @@ const LS_KEY = "cp-red-characters";
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; }
 }
+// Быстрое сохранение текущего персонажа в localStorage без дублей
+// (используется после покупок, экипировки и правок — изменения не теряются)
+function saveDraft() {
+  if (!current) return;
+  try {
+    const list = loadSaved().filter((c) => !(c && c.name === current.name && c.role === current.role));
+    list.unshift(current);
+    localStorage.setItem(LS_KEY, JSON.stringify(list.slice(0, 20)));
+  } catch { /* приватный режим */ }
+}
+
 function saveCharacter() {
   if (!current) return toast("Сначала создайте персонажа!");
   // Актуализируем заметки из поля перед сохранением
@@ -1407,6 +1425,7 @@ function buyCyberware(item) {
   if (!Array.isArray(current.gear)) current.gear = [];
   current.gear.push({ name: `${item.ru || item.name}${item.name && item.ru ? ` (${item.name})` : ""}`, cost, implant: true });
   renderSheet(current);           // обновляем лист: наличные + инвентарь
+  saveDraft();                    // покупки не должны теряться между визитами
   renderShopCatalog(shopCurrent); // перерисовываем кнопки (могла закончиться валюта)
   toast(`Куплено: ${item.ru || item.name} — −${cost.toLocaleString("ru-RU")} eb (остаток ${Number(current.cash).toLocaleString("ru-RU")} eb)`);
 }
@@ -1449,6 +1468,327 @@ function renderShopCatalog(shop) {
       });
     });
   }
+}
+
+// ------------------------------------------------------------
+// Активное оружие и активная броня (панель «Экипировка»)
+//   • только ОДНО оружие и ОДНА броня могут быть активны;
+//   • данные — таблица оружия и брони Core Rulebook (стр. 340–350),
+//     src/shops/weapons.js: у оружия указываем урон (damage),
+//     у брони — SP (stoppage points) из Master Armor List (стр. 350);
+//   • пользователь может указать свой SP брони и свой урон оружия
+//     (клик по чипу значения → поле ввода);
+//   • выбранное предмет добавляется в инвентарь с флагом weapon/armor.
+// ------------------------------------------------------------
+
+// группы WEAPONS, которые считаются оружием (не аксессуары и не броня)
+const WEAPON_GROUP_TITLES = ["Ближний бой (Melee Weapons)", "Дальний бой (Ranged Weapons)", "Экзотическое оружие (Exotic Weapons)"];
+const ARMOR_GROUP_TITLE = "Броня (Master Armor List)";
+const weaponCatalogItems = () => WEAPONS.groups.filter((g) => WEAPON_GROUP_TITLES.includes(g.title)).flatMap((g) => g.items);
+const armorCatalogItems = () => (WEAPONS.groups.find((g) => g.title === ARMOR_GROUP_TITLE)?.items || []);
+
+// базовые характеристики по названиям каталога (для строк снаряжения ролей)
+const WEAPON_BASE_BY_NAME = new Map(weaponCatalogItems().map((it) => [it.name.toLowerCase(), it]));
+const ARMOR_BASE_BY_NAME = new Map(armorCatalogItems().map((it) => [it.name.toLowerCase(), it]));
+
+// строки стартового снаряжения ролей, похожие на оружие/броню (fallback-распознавание)
+const ROLE_GEAR_WEAPON_HINTS = {
+  Solo:      { damage: "2d6" },  // пистоль-пулемёт Malorian Arms 2045
+  Rockerboy: { damage: "2d6" },  // пистолет Cyberpunk Arms Centurion
+  Nomad:     { damage: "5d6" },  // винтовка
+  Fixer:     { damage: "2d6" },  // дипломатичный пистолет
+  Tech:      { damage: "5d6" },  // дробовик
+  Medtech:   { damage: "2d6" },  // пистолет-пулемёт для охраны
+  Exec:      { damage: "2d6" },  // компактный пистолет
+  Lawman:    { damage: "2d6" },  // служебный пистолет Hornet
+};
+const ROLE_GEAR_ARMOR_HINTS = {
+  default:   { sp: 11 }, // Light Bodyshell ≈ Light Armorjack (стр. 350)
+  Solo:      { sp: 13 }, // бронежилет Kiroshka+3
+  Netrunner: { sp: 7 },  // тонкий бронежилет ≈ Kevlar®
+  Nomad:     { sp: 4 },  // бронированный фургон (косвенно)
+  Lawman:    { sp: 13 }, // броня Police Issue ≈ Heavy Armorjack
+  Media:     { sp: 11 }, // легковой бронированный жилет
+};
+
+const normGearName = (s) => String(s || "").toLowerCase().replace(/[«»"'’]/g, "").replace(/\s+/g, " ").trim();
+const isWeaponGear = (g) => !!(g && typeof g === "object" && g.weapon);
+const isArmorGear = (g) => !!(g && typeof g === "object" && g.armor);
+
+// распознавание оружия/брони в инвентаре: флаг → совпадение с каталогом
+// (по полному или короткому названию) → ключевые слова / строки снаряжения ролей
+function classifyGearItem(g, c) {
+  if (!g) return null;
+  const name = typeof g === "string" ? g : String(g.name || "");
+  if (typeof g === "object") {
+    if (g.weapon) return "weapon";
+    if (g.armor) return "armor";
+  }
+  const nm = normGearName(name);
+  // полное имя предмета магазина: «Русское (English)» — английская часть точно из каталога
+  const en = (nm.match(/\(([^)]+)\)\s*$/) || [])[1] || "";
+  const hitCatalog = (map) => map.has(nm) || (en && map.has(en.trim()));
+  if (hitCatalog(ARMOR_BASE_BY_NAME)) return "armor";
+  if (hitCatalog(WEAPON_BASE_BY_NAME)) return "weapon";
+  // fallback для сохранений до появления флагов: ключевые слова
+  if (/оружие|пистолет|пистоль|винтовк|дробовик|пулемёт|автомат|бластер|ружь|карабин/.test(nm)) return "weapon";
+  if (/брон|жилет|armor|кевлар|kevlar|flak|пластин/.test(nm)) return "armor";
+  // строковое снаряжение роли — по справочной таблице GEAR_BY_ROLE
+  if (typeof g === "string" && Array.isArray(c?.gear) && c.gear.includes(g)) {
+    const roleKey = Object.keys(GEAR_BY_ROLE).find((k) => k !== "default" && GEAR_BY_ROLE[k].includes(g));
+    if (roleKey && ROLE_GEAR_WEAPON_HINTS[roleKey] && GEAR_BY_ROLE[roleKey][0] === g) return "weapon";
+    if (roleKey && ROLE_GEAR_ARMOR_HINTS[roleKey] && GEAR_BY_ROLE[roleKey].some((x) => x === g)) return "armor";
+    if (nm.includes("нож")) return "weapon"; // «боевой нож» есть у нескольких ролей
+  }
+  return null;
+}
+
+// найти запись инвентаря по названию (полное или короткое)
+function findGearByName(c, name) {
+  const nm = normGearName(name);
+  return c.gear.find((g) => g && typeof g === "object" && normGearName(g.name) === nm);
+}
+
+// базовые (справочные) характеристики предмета: данные магазина → подсказки ролей
+function baseStatsFor(kind, name) {
+  const nm = normGearName(name);
+  const en = (nm.match(/\(([^)]+)\)\s*$/) || [])[1] || "";
+  const map = kind === "armor" ? ARMOR_BASE_BY_NAME : WEAPON_BASE_BY_NAME;
+  const cat = map.get(nm) || map.get(en.trim());
+  if (cat) return kind === "armor" ? { sp: cat.sp } : { damage: cat.damage };
+  if (Array.isArray(current?.gear) && current.gear.includes(name)) {
+    const roleKey = Object.keys(GEAR_BY_ROLE).find((k) => k !== "default" && GEAR_BY_ROLE[k].includes(name));
+    if (roleKey) {
+      if (kind === "armor" && ROLE_GEAR_ARMOR_HINTS[roleKey]) return ROLE_GEAR_ARMOR_HINTS[roleKey];
+      if (kind === "weapon" && ROLE_GEAR_WEAPON_HINTS[roleKey]) return ROLE_GEAR_WEAPON_HINTS[roleKey];
+    }
+  }
+  return {};
+}
+
+// активный предмет + его характеристики (свои значения пользователя приоритетны)
+function getActiveItem(c, kind) {
+  if (!c) return null;
+  const key = kind === "armor" ? "activeArmor" : "activeWeapon";
+  const flag = kind === "armor" ? "armor" : "weapon";
+  let item = c[key] ? findGearByName(c, c[key]) : null;
+  if (!item || !item[flag]) {
+    item = c.gear.find((g) => g && typeof g === "object" && g[flag]) || null;
+  }
+  if (!item) return null;
+  const base = baseStatsFor(kind, item.name);
+  return kind === "armor"
+    ? { item, sp: Number.isFinite(Number(item.sp)) ? Number(item.sp) : (Number.isFinite(Number(base.sp)) ? Number(base.sp) : null) }
+    : { item, damage: item.damage || base.damage || "" };
+}
+
+// панель «Экипировка» на листе персонажа
+function renderLoadout(c) {
+  const box = $("loadout-box");
+  if (!box) return;
+  const hasChar = !!c;
+  const w = hasChar ? getActiveItem(c, "weapon") : null;
+  const a = hasChar ? getActiveItem(c, "armor") : null;
+  $("active-weapon-name").textContent = w ? w.item.name : (hasChar ? "не выбрано" : "—");
+  $("active-armor-name").textContent = a ? a.item.name : (hasChar ? "не выбрана" : "—");
+  const dmgEl = $("active-weapon-dmg"), spEl = $("active-armor-sp");
+  dmgEl.textContent = w ? `урон ${w.damage || "?"}` : "—";
+  dmgEl.classList.toggle("editable", !!w);
+  spEl.textContent = a ? `SP ${a.sp ?? "?"}` : "—";
+  spEl.classList.toggle("editable", !!a);
+  $("btn-change-weapon").disabled = !hasChar;
+  $("btn-change-armor").disabled = !hasChar;
+}
+
+// клик по чипу «урон …» / «SP …» — пользователь может указать своё значение
+function editActiveStat(kind) {
+  if (!current) return toast("Сначала создайте персонажа!");
+  const act = getActiveItem(current, kind);
+  if (!act) return toast(kind === "armor" ? "Сначала выберите активную броню." : "Сначала выберите активное оружие.");
+  const curVal = kind === "armor" ? (act.sp ?? "") : (act.damage || "");
+  const promptText = kind === "armor"
+    ? "SP активной брони (число, например 13):"
+    : "Урон активного оружия (например 2d6+1 или «3d6»):";
+  const val = window.prompt(promptText, String(curVal));
+  if (val === null) return;
+  const s = val.trim();
+  if (!s) return toast("Значение не изменено (пустой ввод).");
+  if (kind === "armor") {
+    const n = Number(s.replace(",", "."));
+    if (!Number.isFinite(n) || n < 0) return toast("SP должно быть числом (например 13).");
+    act.item.sp = Math.round(n * 10) / 10;
+  } else {
+    act.item.damage = s.slice(0, 24);
+  }
+  renderSheet(current);
+  saveDraft();
+  toast(`${kind === "armor" ? "SP брони" : "Урон оружия"} обновлено: ${kind === "armor" ? "SP " + act.item.sp : act.item.damage}`);
+}
+
+// модальное окно выбора: kind = "weapon" | "armor"
+let loadoutKind = null;
+
+function openLoadoutModal(kind) {
+  if (!current) { toast("Сначала создайте персонажа!"); return; }
+  loadoutKind = kind;
+  const m = $("loadout-modal");
+  if (!m) return;
+  $("loadout-crumb-name").textContent = kind === "armor" ? "🛡️ Активная броня" : "⚔️ Активное оружие";
+  $("loadout-hint").textContent = kind === "armor"
+    ? "Активной может быть только одна броня. SP указано из Master Armor List (стр. 350)."
+    : "Активным может быть только одно оружие. Урон указан из таблиц оружия (стр. 340–349).";
+  renderLoadoutChoices();
+  m.classList.remove("hidden");
+  document.body.classList.add("shop-open");
+}
+
+function closeLoadoutModal() {
+  $("loadout-modal")?.classList.add("hidden");
+  // класс блокировки прокрутки снимаем, если больше не открыто ни одно модальное окно
+  const anyOpen = [$("shop-modal"), $("loadout-modal")]
+    .some((m) => m && !m.classList.contains("hidden"));
+  if (!anyOpen) document.body.classList.remove("shop-open");
+  loadoutKind = null;
+}
+
+function renderLoadoutChoices() {
+  const kind = loadoutKind;
+  if (!kind || !current) return;
+  const catalog = kind === "armor" ? armorCatalogItems() : weaponCatalogItems();
+  const inv = current.gear
+    .map((g, i) => ({ g, i }))
+    .filter(({ g }) => classifyGearItem(g, current) === kind);
+  const tierRu = { Cheap: "дёшево", Everyday: "обычно", Premium: "премиум", Expensive: "дорого", Illicit: "нелегально", Luxury: "роскошь", "Very Expensive": "очень дорого", Costly: "затратно" };
+  const statOf = (it) => kind === "armor"
+    ? (Number.isFinite(Number(it.sp)) ? `SP ${it.sp}` : "")
+    : (it.damage ? `урон ${it.damage}` : "");
+  const groups = [
+    {
+      title: kind === "armor" ? "✔ Из вашего инвентаря" : "✔ Из вашего инвентаря",
+      items: inv.map(({ g, i }) => {
+        const base = baseStatsFor(kind, g.name);
+        const st = kind === "armor"
+          ? (Number.isFinite(Number(g.sp)) ? `SP ${g.sp}` : (base.sp != null ? `SP ${base.sp} (из книги)` : "SP не указан"))
+          : (g.damage || base.damage || "урон не указан");
+        return {
+          label: typeof g === "string" ? g : g.name, sub: st, cost: 0, page: "",
+          active: !!g[kind], buy: false, idx: i,
+        };
+      }),
+    },
+    {
+      title: kind === "armor" ? "Каталог брони (Core Rulebook, стр. 350)" : "Каталог оружия (Core Rulebook, стр. 340–349)",
+      items: catalog.map((it, ci) => ({
+        label: `${it.ru || it.name}${it.name && it.ru ? ` (${it.name})` : ""}`,
+        sub: [statOf(it), it.penalty && it.penalty !== "нет" ? `штраф: ${it.penalty}` : ""].filter(Boolean).join(" · "),
+        cost: Number(it.cost) || 0, page: it.page,
+        active: false, buy: true, catalogItem: it,
+      })),
+    },
+  ];
+
+  $("loadout-groups").innerHTML = groups.map((gr) => `
+    <section class="shop-group">
+      <h3 class="shop-group-title">${gr.title}</h3>
+      <div class="shop-items">
+        ${gr.items.length ? gr.items.map((row, ri) => `
+          <div class="shop-item${row.active ? " shop-item-active" : ""}">
+            <div class="shop-item-main">
+              <span class="shop-item-name">${row.label}${row.active ? ` <b class="loadout-active-tag">активно</b>` : ""}</span>
+              <span class="shop-item-meta muted small">${row.sub}${row.page ? ` · стр. ${row.page}` : ""}</span>
+            </div>
+            <div class="shop-item-side">
+              ${row.buy ? `<span class="shop-item-cost">${row.cost.toLocaleString("ru-RU")} eb</span>` : ""}
+              ${row.active
+                ? `<button class="btn tiny ghost" type="button" data-lo-unset="${ri}">✕ Снять</button>`
+                : row.buy
+                  ? `<button class="btn tiny shop-buy-btn" type="button" data-lo-catalog="${ri}"
+                       ${canAfford(row.cost) ? "" : "disabled title=\"Недостаточно эдди\""}>${row.cost > 0 ? "💸 Купить и надеть" : "Надеть"}</button>`
+                  : `<button class="btn tiny shop-buy-btn" type="button" data-lo-wear="${row.idx}">✔ Надеть</button>`}
+            </div>
+          </div>`).join("")
+        : `<p class="muted small" style="padding:8px 12px;">В инвентаре пока нет ${kind === "armor" ? "брони" : "оружия"} — выберите из каталога ниже.</p>`}
+      </div>
+    </section>`).join("");
+
+  // обработчики (делегирование через dataset)
+  const wrap = $("loadout-groups");
+  const catalogGroup = groups[1].items;
+  wrap.querySelectorAll("[data-lo-wear]").forEach((btn) => btn.addEventListener("click", () => {
+    setActiveFromInventory(loadoutKind, Number(btn.dataset.loWear));
+  }));
+  wrap.querySelectorAll("[data-lo-unset]").forEach((btn) => btn.addEventListener("click", () => {
+    unsetActive(loadoutKind);
+  }));
+  wrap.querySelectorAll("[data-lo-catalog]").forEach((btn) => btn.addEventListener("click", () => {
+    buyAndEquip(catalogGroup[Number(btn.dataset.loCatalog)]?.catalogItem);
+  }));
+}
+
+// сделать активным предмет, уже лежащий в инвентаре (индекс c.gear)
+function setActiveFromInventory(kind, idx) {
+  const g = current.gear[idx];
+  if (!g) return;
+  if (typeof g === "string") {
+    // строка снаряжения роли → превращаем в объект с флагом, сохраняя текст
+    current.gear[idx] = { name: g, cost: 0, [kind]: true };
+  } else {
+    g[kind] = true;
+  }
+  afterEquip(kind, typeof g === "string" ? g : g.name);
+}
+
+// покупка товара из каталога и немедленная экипировка (цена списывается с наличных)
+function buyAndEquip(item) {
+  if (!current || !item) return;
+  const kind = loadoutKind;
+  const cost = Number(item.cost) || 0;
+  if (!canAfford(cost)) { toast(`Недостаточно эдди: нужно ${cost.toLocaleString("ru-RU")}, есть ${Number(current.cash).toLocaleString("ru-RU")}`); return; }
+  current.cash -= cost;
+  const entry = {
+    name: `${item.ru || item.name}${item.name && item.ru ? ` (${item.name})` : ""}`,
+    cost,
+    [kind]: true,
+  };
+  if (kind === "armor") entry.sp = Number(item.sp); else entry.damage = item.damage || "";
+  if (!Array.isArray(current.gear)) current.gear = [];
+  current.gear.push(entry);
+  afterEquip(kind, entry.name, cost);
+}
+
+// снять статус активного с всех предметов данного типа, кроме одного (или ни с какого)
+function clearActiveFlags(kind, exceptName) {
+  for (const g of current.gear) {
+    if (g && typeof g === "object" && g[kind] && normGearName(g.name) !== normGearName(exceptName || "")) {
+      delete g.active;
+    }
+  }
+}
+
+function afterEquip(kind, name, cost) {
+  const key = kind === "armor" ? "activeArmor" : "activeWeapon";
+  current[key] = name;
+  // единственность: активный предмет данного типа — ровно один
+  clearActiveFlags(kind, name);
+  const worn = findGearByName(current, name);
+  if (worn) worn.active = true;
+  renderSheet(current);
+  saveDraft();
+  if ($("loadout-modal") && !$("loadout-modal").classList.contains("hidden")) renderLoadoutChoices();
+  toast(cost
+    ? `Куплено и надето: ${name} — −${cost.toLocaleString("ru-RU")} eb`
+    : `Надето: ${name}`);
+}
+
+function unsetActive(kind) {
+  const key = kind === "armor" ? "activeArmor" : "activeWeapon";
+  const act = getActiveItem(current, kind);
+  if (act?.item) delete act.item.active;
+  current[key] = null;
+  renderSheet(current);
+  saveDraft();
+  renderLoadoutChoices();
+  toast(kind === "armor" ? "Активная броня снята." : "Активное оружие убрано.");
 }
 
 // ------------------------------------------------------------
@@ -1535,7 +1875,16 @@ function init() {
     el.addEventListener("click", closeShopModal));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("shop-modal")?.classList.contains("hidden")) closeShopModal();
+    if (e.key === "Escape" && !$("loadout-modal")?.classList.contains("hidden")) closeLoadoutModal();
   });
+
+  // Экипировка: активное оружие / активная броня (кнопки «Сменить», клик по SP/урону)
+  $("btn-change-weapon")?.addEventListener("click", () => openLoadoutModal("weapon"));
+  $("btn-change-armor")?.addEventListener("click", () => openLoadoutModal("armor"));
+  $("active-weapon-dmg")?.addEventListener("click", () => editActiveStat("weapon"));
+  $("active-armor-sp")?.addEventListener("click", () => editActiveStat("armor"));
+  document.querySelectorAll("[data-loadout-close]").forEach((el) =>
+    el.addEventListener("click", closeLoadoutModal));
 
   // Горячая клавиша Ctrl+B — скрыть/показать панель генерации (не срабатывает в полях ввода)
   document.addEventListener("keydown", (e) => {

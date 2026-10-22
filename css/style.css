@@ -575,3 +575,30 @@ body.shop-open { overflow: hidden; }
   letter-spacing: .03em;
 }
 .implants-list li::marker { color: var(--yellow); }
+
+/* ===== Экипировка: активное оружие и активная броня ===== */
+.loadout-box {
+  margin-top: 10px; padding-top: 8px;
+  border-top: 1px dashed var(--line, #333);
+}
+.loadout-title {
+  margin: 0 0 6px; font-size: 14px; color: var(--cyan, #39f);
+  letter-spacing: .03em;
+}
+.loadout-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 4px 0; font-size: 13px;
+}
+.loadout-label { opacity: .85; white-space: nowrap; }
+.loadout-value { font-weight: 700; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.loadout-stat {
+  cursor: pointer; user-select: none; white-space: nowrap;
+  padding: 1px 8px; border-radius: 10px;
+  border: 1px solid var(--line, #333); background: rgba(255,255,255,.04);
+  font-weight: 700; color: var(--yellow, #ff0);
+}
+.loadout-stat.editable:hover { border-color: var(--yellow, #ff0); box-shadow: 0 0 8px rgba(255,255,0,.25); }
+.gear-active-tag { color: var(--cyan, #39f); font-size: 12px; margin-left: 6px; }
+.shop-item-active { outline: 1px solid var(--cyan, #39f); background: rgba(0,255,255,.05); }
+.loadout-active-tag { color: var(--cyan, #39f); font-size: 11px; margin-left: 6px; text-transform: uppercase; letter-spacing: .05em; }
+.loadout-dialog { max-width: 720px; }
