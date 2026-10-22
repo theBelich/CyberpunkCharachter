@@ -379,6 +379,12 @@ function toast(msg) {
 // Инициализация
 // ------------------------------------------------------------
 function init() {
+  // Защита: если скрипт выполнился до готовности DOM, ждём DOMContentLoaded
+  if (!document.body || !$("role-select")) {
+    document.addEventListener("DOMContentLoaded", init);
+    return;
+  }
+
   // Выпадающий список «Стиль» (панель «Данные персонажа»)
   const styleSel = $("sel-style");
   if (styleSel) {
@@ -388,11 +394,21 @@ function init() {
   }
 
   const sel = $("role-select");
-  sel.innerHTML = ROLES
-    .map((r) => `<option value="${r.role}">${ROLE_RU[r.role] || r.role} (${r.role})</option>`)
-    .join("");
+  // Наполняем dropdown ролями; дополнительно добавляем option'ы разметкой
+  // (fallback на случай, если JS не выполнится — тогда роли всё равно будут видны)
+  ROLES.forEach((r) => {
+    const label = `${ROLE_RU[r.role] || r.role} (${r.role})`;
+    let opt = sel.querySelector(`option[value="${r.role}"]`);
+    if (!opt) {
+      opt = document.createElement("option");
+      opt.value = r.role;
+      sel.appendChild(opt);
+    }
+    opt.textContent = label;
+  });
   sel.addEventListener("change", () => {
-    const r = ROLES.find((x) => x.role === sel.value);
+    const r = ROLES.find((x) => x.role === sel.value) || ROLES[0];
+    if (!ROLES.some((x) => x.role === sel.value)) sel.value = r.role;
     $("role-info").innerHTML =
       `<p><b>Роль:</b> ${ROLE_RU[r.role]}</p>
        <p><b>Навыки роли:</b> ${r.skills.map(skillRu).slice(0, 6).join(", ")}…</p>
@@ -431,4 +447,9 @@ function init() {
   sel.dispatchEvent(new Event("change"));
 }
 
-document.addEventListener("DOMContentLoaded", init);
+// Если DOM уже готов — запускаем сразу; иначе ждём DOMContentLoaded
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
