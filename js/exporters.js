@@ -118,9 +118,26 @@ export function buildSheetData(c, dict) {
       return [ru.nameOf(s.name), st, ru.statName(st), s.level, (typeof c.stats[st] === "number" ? c.stats[st] : 0) + s.level];
     }),
     lifepath: c.lifepath.map((lp) => [lp.label, lp.value]),
-    gear: c.gear.slice(),
+    gear: c.gear.filter((g) => !isImplantGear(g)).map(gearLabel),
+    // Импланты — отдельный список (киберимпланты из магазина)
+    implants: c.gear.filter(isImplantGear).map(gearLabel),
     note: c.note
   };
+}
+
+// Киберимплант в инвентаре: объект с флагом implant:true (ставится при
+// покупке в магазине «Киберимпланты»). Тот же признак, что и в js/app.js.
+function isImplantGear(g) {
+  return !!(g && typeof g === "object" && g.implant);
+}
+
+// Строка инвентаря для экспорта/печати: элементы могут быть текстом
+// (снаряжение роли) или объектом { name, cost } (покупки в магазине)
+function gearLabel(g) {
+  if (g && typeof g === "object") {
+    return `${g.name}${Number(g.cost) > 0 ? ` (${Number(g.cost).toLocaleString("ru-RU")} eb)` : ""}`;
+  }
+  return g;
 }
 
 // ---------- Экспорт в JSON ----------
@@ -202,7 +219,8 @@ export function exportXLSX(data) {
     S("Характеристики", [["Абр.", "Название", "Значение"], ...data.stats]),
     S("Навыки", [["Навык", "Хар-ка", "Название хар-ки", "Уровень", "Ур.+хар-ка"], ...data.skills]),
     S("Жизненный путь", [["Пункт", "Значение"], ...data.lifepath]),
-    S("Снаряжение", [["Предмет"], ...data.gear.map((g) => [g])])
+    S("Снаряжение", [["Предмет"], ...data.gear.map((g) => [g])]),
+    S("Импланты", [["Имплант"], ...(data.implants || []).map((g) => [g])])
   ];
 
   const wbSheets = sheets.map((s, i) =>
@@ -703,10 +721,29 @@ export function exportPDF(c, dict) {
     for (const lp of c.lifepath) kv(lp.label + ":", lp.value || "—");
   }
 
-  // ---- Снаряжение ----
-  if (c.gear?.length) {
+  // ---- Снаряжение (без имплантов — они в отдельном списке «Импланты») ----
+  const gearPlain = (c.gear || []).filter((g) => !isImplantGear(g));
+  if (gearPlain.length) {
     section("Снаряжение", CP.red);
-    for (const g of c.gear) {
+    for (const gRaw of gearPlain) {
+      const g = String(gearLabel(gRaw)); // покупки из магазина — объекты { name, cost }
+      const lines = wrapText(g, R, 9, CW - 30);
+      lines.forEach((ln, i) => {
+        ensure(13);
+        if (i === 0) ops.push(`BT /F1 9 Tf ${hexRgb(CP.cyan).join(" ")} rg ${M + 6} ${(y - 9).toFixed(2)} Td (\u2022) Tj ET`);
+        ops.push(`BT /F1 9 Tf ${hexRgb(CP.text).join(" ")} rg ${M + 18} ${(y - 9).toFixed(2)} Td (${escStr(ln)}) Tj ET`);
+        y -= 12;
+      });
+      y -= 2;
+    }
+  }
+
+  // ---- Импланты (киберимпланты, купленные в магазине) ----
+  const implantList = (c.gear || []).filter(isImplantGear);
+  if (implantList.length) {
+    section("Импланты", CP.yellow);
+    for (const gRaw of implantList) {
+      const g = String(gearLabel(gRaw));
       const lines = wrapText(g, R, 9, CW - 30);
       lines.forEach((ln, i) => {
         ensure(13);

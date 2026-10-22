@@ -1789,9 +1789,26 @@ function buildSheetData(c, dict) {
       return [ru.nameOf(s.name), st, ru.statName(st), s.level, (typeof c.stats[st] === "number" ? c.stats[st] : 0) + s.level];
     }),
     lifepath: c.lifepath.map((lp) => [lp.label, lp.value]),
-    gear: c.gear.slice(),
+    gear: c.gear.filter((g) => !isImplantGear(g)).map(gearLabel),
+    // Импланты — отдельный список (киберимпланты из магазина)
+    implants: c.gear.filter(isImplantGear).map(gearLabel),
     note: c.note
   };
+}
+
+// Киберимплант в инвентаре: объект с флагом implant:true (ставится при
+// покупке в магазине «Киберимпланты»). Тот же признак, что и в js/app.js.
+function isImplantGear(g) {
+  return !!(g && typeof g === "object" && g.implant);
+}
+
+// Строка инвентаря для экспорта/печати: элементы могут быть текстом
+// (снаряжение роли) или объектом { name, cost } (покупки в магазине)
+function gearLabel(g) {
+  if (g && typeof g === "object") {
+    return `${g.name}${Number(g.cost) > 0 ? ` (${Number(g.cost).toLocaleString("ru-RU")} eb)` : ""}`;
+  }
+  return g;
 }
 
 // ---------- Экспорт в JSON ----------
@@ -1873,7 +1890,8 @@ function exportXLSX(data) {
     S("Характеристики", [["Абр.", "Название", "Значение"], ...data.stats]),
     S("Навыки", [["Навык", "Хар-ка", "Название хар-ки", "Уровень", "Ур.+хар-ка"], ...data.skills]),
     S("Жизненный путь", [["Пункт", "Значение"], ...data.lifepath]),
-    S("Снаряжение", [["Предмет"], ...data.gear.map((g) => [g])])
+    S("Снаряжение", [["Предмет"], ...data.gear.map((g) => [g])]),
+    S("Импланты", [["Имплант"], ...(data.implants || []).map((g) => [g])])
   ];
 
   const wbSheets = sheets.map((s, i) =>
@@ -2374,10 +2392,29 @@ function exportPDF(c, dict) {
     for (const lp of c.lifepath) kv(lp.label + ":", lp.value || "—");
   }
 
-  // ---- Снаряжение ----
-  if (c.gear?.length) {
+  // ---- Снаряжение (без имплантов — они в отдельном списке «Импланты») ----
+  const gearPlain = (c.gear || []).filter((g) => !isImplantGear(g));
+  if (gearPlain.length) {
     section("Снаряжение", CP.red);
-    for (const g of c.gear) {
+    for (const gRaw of gearPlain) {
+      const g = String(gearLabel(gRaw)); // покупки из магазина — объекты { name, cost }
+      const lines = wrapText(g, R, 9, CW - 30);
+      lines.forEach((ln, i) => {
+        ensure(13);
+        if (i === 0) ops.push(`BT /F1 9 Tf ${hexRgb(CP.cyan).join(" ")} rg ${M + 6} ${(y - 9).toFixed(2)} Td (\u2022) Tj ET`);
+        ops.push(`BT /F1 9 Tf ${hexRgb(CP.text).join(" ")} rg ${M + 18} ${(y - 9).toFixed(2)} Td (${escStr(ln)}) Tj ET`);
+        y -= 12;
+      });
+      y -= 2;
+    }
+  }
+
+  // ---- Импланты (киберимпланты, купленные в магазине) ----
+  const implantList = (c.gear || []).filter(isImplantGear);
+  if (implantList.length) {
+    section("Импланты", CP.yellow);
+    for (const gRaw of implantList) {
+      const g = String(gearLabel(gRaw));
       const lines = wrapText(g, R, 9, CW - 30);
       lines.forEach((ln, i) => {
         ensure(13);
@@ -2502,6 +2539,8 @@ function downloadBlob(blob, filename) {
 // Справочник навыков (названия и связка «навык → характеристика»): data/skills.js
 // ============================================================
 
+// Каталог киберимплантов (данные PDF-таблиц) — используется для распознавания
+// имплантов в инвентаре (список «Импланты») и для магазина.
 
 const ROLES = Object.values(ROLE_DATA);
 
@@ -3199,8 +3238,58 @@ function renderSheet(c) {
       </div>`)
     .join("") + `<p class="small muted" style="margin-top:8px;">${c.note}</p>`;
 
-  $("gear-list").innerHTML = c.gear.map((g) => `<li>${g}</li>`).join("");
+  // Инвентарь: строки могут быть текстом (снаряжение роли / старые сохранения)
+  // или объектом { name, cost, implant? } — предметы, купленные в магазине.
+  // Киберимпланты (флаг implant:true, ставится при покупке в магазине
+  // «Киберимпланты») выделены в отдельный список под названием «Импланты».
+  const gearItemHtml = (g) => {
+    const isObj = g && typeof g === "object";
+    const label = isObj ? g.name : g;
+    const price = isObj && Number(g.cost) > 0
+      ? ` <b class="gear-cost">(${Number(g.cost).toLocaleString("ru-RU")} eb)</b>` : "";
+    return `<li>${label}${price}</li>`;
+  };
+  const implants = c.gear.filter(isImplantGear);
+  const otherGear = c.gear.filter((g) => !isImplantGear(g));
+  $("gear-list").innerHTML = otherGear.length
+    ? otherGear.map(gearItemHtml).join("")
+    : `<li class="muted">${implants.length ? "Нет обычного снаряжения." : "Нет данных — персонаж ещё не создан."}</li>`;
+  const impBox = $("implants-box");
+  if (impBox) {
+    impBox.classList.toggle("hidden", !implants.length);
+    $("implants-count").textContent = `(${implants.length})`;
+    $("implants-list").innerHTML = implants.map(gearItemHtml).join("");
+  }
   $("ch-cash").textContent = c.cash.toLocaleString("ru-RU") + " эдди";
+}
+
+// -------------------------------------------------------------
+// Импланты — отдельный список на листе персонажа (под инвентарём).
+// Попадает туда любой предмет, купленный в магазине киберимплантов:
+// при покупке в запись инвентаря добавляется флаг implant:true.
+// -------------------------------------------------------------
+const IMPLANT_KEYWORDS = [
+  "оптика", "аудитор", "усилитель голоса", "фильтр", "датчик", "термальн",
+  "анти-вспышк", "детектор", "телефон", "рекордер", "видео", "нейровар",
+  "сокет", "браунер", "чипвар", "тракер", "гидра-г", "скальпель", "кулаки",
+  "бронированн", "кости", "мышц", "сухожили", "легки", "печень", "желудок",
+  "кожа", "кровь", "стайлер", "хром", "шипы", "пластины", "биомонитор",
+  "химскин", "эм-ти", "эмп-нит", "нарни", "уровни", "глаза", "руки",
+];
+// базовое снаряжение ролей (строки GEAR_BY_ROLE) не должно ошибочно попасть
+// в список имплантов по ключевым словам — оно явно перечислено здесь
+const BASE_GEAR_TEXTS = new Set(Object.values(GEAR_BY_ROLE).flat());
+
+function isImplantGear(g) {
+  if (!g || typeof g !== "object") return false;   // обычные строки — не импланты
+  if (g.implant) return true;                      // куплено в магазине киберимплантов
+  // fallback для сохранений, сделанных до появления флага: название из
+  // каталога CYBERWARE («Русское (English Name)») или известный ключевой термин
+  const nm = String(g.name || "").toLowerCase();
+  const en = (nm.match(/\(([^)]+)\)/) || [])[1] || nm;
+  const inCatalog = CYBERWARE.groups.some((gr) => gr.items.some((it) => it.name.toLowerCase() === en.trim()));
+  if (inCatalog) return true;
+  return !BASE_GEAR_TEXTS.has(g.name) && IMPLANT_KEYWORDS.some((k) => nm.includes(k));
 }
 
 // ------------------------------------------------------------
@@ -3784,10 +3873,32 @@ function renderShopPicker() {
   });
 }
 
-// Шаг 2: каталог выбранного магазина (группы + товары из PDF-таблиц)
+// Шаг 2: каталог выбранного магазина (группы + товары из PDF-таблиц).
+// В магазине киберимплантов у каждого товара есть кнопка «💸 Купить»:
+// цена вычитается из наличных персонажа, имплант добавляется в инвентарь;
+// если валюты не хватает — кнопка заблокирована (disabled).
+function canAfford(cost) {
+  return !!current && Number(current.cash) >= Number(cost);
+}
+
+function buyCyberware(item) {
+  if (!current) { toast("Сначала создайте персонажа!"); return; }
+  const cost = Number(item.cost) || 0;
+  if (!canAfford(cost)) { toast(`Недостаточно эдди: нужно ${cost.toLocaleString("ru-RU")}, есть ${Number(current.cash).toLocaleString("ru-RU")}`); return; }
+  current.cash -= cost;
+  // Предмет уходит в инвентарь (объект с названием и ценой — renderSheet это понимает).
+  // Флаг implant:true — основание для отдельного списка «Импланты» на листе.
+  if (!Array.isArray(current.gear)) current.gear = [];
+  current.gear.push({ name: `${item.ru || item.name}${item.name && item.ru ? ` (${item.name})` : ""}`, cost, implant: true });
+  renderSheet(current);           // обновляем лист: наличные + инвентарь
+  renderShopCatalog(shopCurrent); // перерисовываем кнопки (могла закончиться валюта)
+  toast(`Куплено: ${item.ru || item.name} — −${cost.toLocaleString("ru-RU")} eb (остаток ${Number(current.cash).toLocaleString("ru-RU")} eb)`);
+}
+
 function renderShopCatalog(shop) {
   $("shop-crumb-name").textContent = `${shop.icon || ""} ${shop.ru}`;
   $("shop-src").textContent = shop.src || "";
+  const isCyberware = shop.id === "cyberware";
   const tierRu = { Cheap: "дёшево", Everyday: "обычно", Premium: "премиум", Expensive: "дорого", Illicit: "нелегально" };
   $("shop-groups").innerHTML = shop.groups.map((g) => `
     <section class="shop-group">
@@ -3802,10 +3913,26 @@ function renderShopCatalog(shop) {
               </span>
               ${it.desc ? `<span class="shop-item-desc muted small">${it.desc}</span>` : ""}
             </div>
-            <span class="shop-item-cost">${Number(it.cost).toLocaleString("ru-RU")} eb</span>
+            <div class="shop-item-side">
+              <span class="shop-item-cost">${Number(it.cost).toLocaleString("ru-RU")} eb</span>
+              ${isCyberware ? `<button class="btn tiny shop-buy-btn" type="button" data-item-key="${g.title}|||${it.name}"
+                  ${canAfford(it.cost) ? "" : "disabled title=\"Недостаточно эдди\""}>💸 Купить</button>` : ""}
+            </div>
           </div>`).join("")}
       </div>
     </section>`).join("");
+
+  // Навешиваем обработчики на кнопки покупки (делегирование через dataset)
+  if (isCyberware) {
+    $("shop-groups").querySelectorAll(".shop-buy-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const [groupTitle, itemName] = btn.dataset.itemKey.split("|||");
+        const group = shop.groups.find((x) => x.title === groupTitle);
+        const item = group?.items.find((x) => x.name === itemName);
+        if (item) buyCyberware(item);
+      });
+    });
+  }
 }
 
 // ------------------------------------------------------------
