@@ -297,12 +297,15 @@ table.skills input.lvl-input:focus { outline: none; border-color: var(--red); }
 
 /* ---------- умения: сетка скруглённых карточек по группам ---------- */
 .skills-wrap { display: block; } /* группы умений занимают всю ширину панели */
-/* Masonry-раскладка: карточки групп заполняют колонки целиком, без пустот
-   в конце ряда. Колонки формирует CSS (column-count — число колонок задаёт
-   JS-раскладчик через --sg-cols), а порядок «самая короткая колонка» и
-   плавные переезды карточек обеспечивает js/app.js (setupSkillGroupsMasonry).
-   Карточки никогда не наезжают друг на друга: каждая занимает свой
-   собственный поток внутри колонки. */
+/* Masonry-раскладка: карточки групп заполняют пространство целиком, без
+   пустот («хвостов» в конце ряда) и без наездов. Базовая раскладка —
+   многостолбцовый CSS-поток (column-count: число колонок задаёт JS через
+   --sg-cols). Поверх него JS-раскладчик (js/app.js, applySkillGroupsLayout)
+   выполняет балансировку «в самую короткую колонку»: переставляет карточки
+   в DOM и точечно поднимает низ самых длинных колонок переменными
+   --sg-shift/--sg-shrink, поэтому все колонки заканчиваются почти на одной
+   линии. Карточки остаются в обычном потоке колонок — наехать друг на
+   друга они физически не могут. */
 .skill-groups {
   --sg-cols: 1;
   --sg-gap: 14px;
@@ -310,17 +313,18 @@ table.skills input.lvl-input:focus { outline: none; border-color: var(--red); }
   column-count: var(--sg-cols);
   column-gap: var(--sg-gap);
 }
-.skill-groups::after { content: ""; display: block; clear: both; }
 .skill-group-card {
   border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--panel-2); overflow: hidden;
   display: inline-block;      /* надёжно для многоколоночного потока */
   width: 100%;
-  margin: 0 0 var(--sg-gap);
+  margin: 0 0 calc(var(--sg-gap) + var(--sg-shrink, 0px));
+  transform: translateY(calc(var(--sg-shift, 0px) + var(--sg-drop, 0px)));
+  transition: transform .35s ease;
   break-inside: avoid;        /* карточка не разрывается между колонками */
   page-break-inside: avoid;
 }
-.skill-group-card:last-child { margin-bottom: 0; }
+.skill-group-card:last-child { margin-bottom: calc(var(--sg-shrink, 0px)); }
 .skill-group-head {
   display: flex; align-items: center; gap: 8px; width: 100%;
   background: rgba(0,229,255,.06); border: none; border-bottom: 1px solid var(--line);
