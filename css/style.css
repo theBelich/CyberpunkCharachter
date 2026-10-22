@@ -297,44 +297,64 @@ table.skills input.lvl-input:focus { outline: none; border-color: var(--red); }
 
 /* ---------- умения: сетка скруглённых карточек по группам ---------- */
 .skills-wrap { display: block; } /* группы умений занимают всю ширину панели */
-/* Masonry-сетка: карточки групп «переливаются» по колонкам и плавно
-   заполняют всю высоту контейнера без пустот в конце ряда.
-   Число колонок (--sg-cols) и позиции карточек задаёт JS-раскладчик
-   (setupSkillGroupsMasonry в js/app.js); здесь — базовые стили и fallback. */
+/* Masonry-раскладка: карточки групп плавно занимают всё пространство без
+   пустот («хвостов» внизу колонок) и без наездов. JS-раскладчик
+   (js/app.js, applySkillGroupsLayout) — единственный источник геометрии:
+   измеряет честные высоты карточек, распределяет их жадным masonry «в самую
+   короткую колонку» и выдаёт каждой карточке координаты --sg-x/--sg-y и
+   ширину колонки --sg-w. Карточки позиционированы абсолютно внутри
+   .skill-groups (position:relative), поэтому не могут ни наехать друг на
+   друга (координаты считаются из одной модели), ни оставить пустоту в конце
+   ряда (низ колонок выравнивается). Плавность переездов — CSS-transition по
+   transform + FLIP-инверсия в JS. */
 .skill-groups {
   --sg-cols: 1;
   --sg-gap: 14px;
-  --sg-row: 8px;           /* высота тонкой строки-«пикселя» */
-  display: grid;
-  grid-template-columns: repeat(var(--sg-cols), minmax(0, 1fr));
-  grid-auto-rows: var(--sg-row);
-  gap: var(--sg-gap);
-  align-items: start;
-}
-/* Нативный masonry (если браузер его поддерживает) — проще и плавнее */
-@supports (grid-template-rows: masonry) {
-  .skill-groups {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    grid-template-rows: masonry;
-    grid-auto-rows: auto;
-  }
-  .skill-groups > .skill-group-card { grid-row: auto !important; grid-column: auto !important; }
-}
-/* Fallback: если JS-раскладчик не применился — обычная auto-fit сетка */
-.skill-groups.no-js-layout {
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  grid-auto-rows: auto;
+  position: relative;           /* зона для абсолютно позиционированных карточек */
+  display: block;               /* НЕ grid и НЕ column-flow: позиции задаёт JS */
 }
 .skill-group-card {
+  position: absolute;           /* координаты выдаёт JS (masonry-раскладчик) */
+  left: var(--sg-x, 0px);
+  top: var(--sg-y, 0px);
+  width: var(--sg-w, 100%);     /* ширина колонки — одна на всех, без % от контейнера */
+  margin: 0;
   border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--panel-2); overflow: hidden;
-  contain: layout style; /* изолируем пересчёты размеров карточек */
 }
-/* невидимая карточка-эталон: по ней раскладчик измеряет «естественную»
-   ширину и высоту групп при текущем числе колонок */
+/* до первой раскладки JS карточки стоят в обычном потоке (stack fallback),
+   чтобы лист был читаем даже при выключенном/ошибочном скрипте.
+   !important обязателен: ниже по файлу есть медиазапросы с .skill-group-card
+   (position: static), которые иначе переопределили бы это правило */
+.skill-groups:not(.sg-ready) .skill-group-card {
+  position: static !important;
+  width: auto !important;
+  margin-bottom: var(--sg-gap);
+}
+/* скрытый контейнер-измеритель (клон карточки для замера честной высоты):
+   лежит вне потока и не влияет на размеры страницы — защита от resize-циклов */
 .sg-measure {
-  position: absolute !important; top: 0; left: 0;
-  visibility: hidden; pointer-events: none; z-index: -1;
+  position: fixed !important;
+  top: 0; left: -9999px;
+  width: 300px; height: 8px;
+  overflow: visible;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+.sg-measure .sg-clone {
+  position: static !important;
+  width: 100% !important;
+  left: auto !important; top: auto !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+@media print {
+  /* печать/PDF: абсолютные координаты masonry не переносит по страницам —
+     возвращаем карточки в обычный поток */
+  .skill-group-card { position: static !important; width: auto !important; margin-bottom: var(--sg-gap); }
+  .skill-groups { min-height: 0 !important; }
+  .sg-measure { display: none !important; }
 }
 .skill-group-head {
   display: flex; align-items: center; gap: 8px; width: 100%;
@@ -351,31 +371,20 @@ table.skills input.lvl-input:focus { outline: none; border-color: var(--red); }
 }
 .skill-group-card.collapsed .sg-preview { visibility: visible; }
 .skill-group-card.collapsed .skill-group-head { border-bottom-color: transparent; }
+/* САМО сворачивание содержимого группы (важно: без этого правила клик по
+   заголовку только менял класс, а сетка умений оставалась на экране —
+   «сворачивание не работало») */
+.skill-group-card.collapsed .skill-grid { display: none; }
 .skill-group-card .collapse-arrow { margin-left: auto; color: var(--cyan); font-size: 14px; transition: transform .2s ease; }
 .skill-group-card.collapsed .collapse-arrow { transform: rotate(-90deg); }
 .skill-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 8px;
   padding: 12px;
 }
-.skill-group-card.collapsed .skill-grid { display: none; }
-/* плавное сворачивание/разворачивание содержимого группы */
-.skill-group-card .skill-grid {
-  display: grid;
-  transition: opacity .25s ease, max-height .35s ease, padding .35s ease;
-}
-.skill-group-card.collapsed .skill-grid {
-  grid-template-columns: 1fr; /* не участвует в раскладке при нулевой высоте */
-  max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; overflow: hidden;
-  pointer-events: none;
-}
-.skill-group-card:not(.collapsed) .skill-grid { max-height: 100000px; opacity: 1; }
 /* на печати и в PDF-версии листа свёрнутые группы разворачиваются —
    печатный лист всегда содержит все умения */
 @media print {
-  /* печать использует простую потоковую раскладку (без masonry-позиционирования) */
-  .skill-groups { display: block !important; }
-  .skill-groups > .skill-group-card { grid-row: auto !important; grid-column: auto !important; margin-bottom: 14px; break-inside: avoid; }
-  .skill-group-card.collapsed .skill-grid { display: grid !important; max-height: none !important; padding: 12px !important; opacity: 1 !important; overflow: visible !important; }
+  .skill-group-card.collapsed .skill-grid { display: grid; }
   .skill-group-card.collapsed .sg-preview { visibility: hidden; }
   .role-ability-text.collapsed { display: block; }
 }
