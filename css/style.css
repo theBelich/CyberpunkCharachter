@@ -202,6 +202,22 @@ body {
 .stat-val { font-size: 28px; font-weight: 900; color: #fff; line-height: 1.1; text-shadow: 0 0 14px rgba(255,0,60,.4); }
 .stat-name { font-size: 10px; color: var(--muted); min-height: 24px; }
 
+/* редактирование характеристик прямо на листе */
+.stat-edit { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.stat-input {
+  width: 56px; padding: 2px 4px; text-align: center; font: inherit;
+  background: var(--panel-2); color: #fff; border: 1px solid var(--line);
+  border-radius: 8px; -moz-appearance: textfield; appearance: textfield;
+}
+.stat-input::-webkit-outer-spin-button, .stat-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stat-input:focus { outline: none; border-color: var(--red); box-shadow: 0 0 10px rgba(255,0,60,.35); }
+.stat-step {
+  width: 22px; height: 26px; padding: 0; cursor: pointer; line-height: 1;
+  font-size: 15px; font-weight: 700; color: var(--yellow);
+  background: rgba(255,213,79,.08); border: 1px solid rgba(255,213,79,.35); border-radius: 7px;
+}
+.stat-step:hover { background: rgba(255,213,79,.2); }
+
 /* производные */
 .derived-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 .dstat {
@@ -317,4 +333,7 @@ ul.list li { margin: 3px 0; }
   .layout { grid-template-columns: 1fr; padding: 0; }
   .sheet-card { box-shadow: none; border-color: #ccc; background: #fff; }
   .stat-val, table.skills td.lvl { color: #000; text-shadow: none; }
+  /* редактируемые поля на печати выглядят как обычные значения */
+  .stat-input { border: none; background: transparent; color: #000; width: 40px; }
+  .stat-step { display: none !important; }
 }
