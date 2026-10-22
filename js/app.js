@@ -18,7 +18,7 @@ import { medtech } from "../src/roles/medtech.js";
 import { exec } from "../src/roles/exec.js";
 import { media } from "../src/roles/media.js";
 import { lawman } from "../src/roles/lawman.js";
-import { SKILL_BY_NAME } from "../data/skills.js";
+import { SKILLS, SKILL_BY_NAME, SKILL_GROUPS } from "../data/skills.js";
 
 const ROLES = [solo, netrunner, rockerboy, nomad, fixer, tech, medtech, exec, media, lawman];
 
@@ -34,6 +34,13 @@ const ROLE_RU = {
 const STAT_RU = {
   INT: "Интеллект", REF: "Рефлексы", DEX: "Ловкость", TECH: "Техника", COOL: "Самообладание",
   WILL: "Воля", LUCK: "Удача", MOVE: "Скорость", BODY: "Телосложение", EMP: "Эмпатия"
+};
+
+// Русские названия групп навыков (Skill Definitions, Core Rulebook стр. 82–85)
+const GROUP_RU = {
+  Awareness: "Восприятие", Body: "Тело", Control: "Управление", Education: "Образование",
+  Fighting: "Бой", Performance: "Выступление", "Ranged Weapons": "Стрельба",
+  Social: "Социальные", Technique: "Техника"
 };
 
 // Русское название навыка берётся из справочника data/skills.js
@@ -96,6 +103,16 @@ function rollSkills(roleData) {
     else if (skills.every((x) => x.level >= max)) break;
   }
   return skills;
+}
+
+// Полный список ВСЕХ навыков игры (data/skills.js): навыки персонажа,
+// которых нет в его роли, получают уровень 0 — так на листе отображаются
+// все навыки справочника, а не только профессиональные навыки роли.
+const ALL_SKILL_NAMES = SKILLS.map((s) => s.name);
+
+function buildFullSkillList(roleSkills) {
+  const byName = Object.fromEntries(roleSkills.map((s) => [s.name, s]));
+  return ALL_SKILL_NAMES.map((name) => byName[name] || { name, level: 0 });
 }
 
 // ------------------------------------------------------------
@@ -182,7 +199,7 @@ function createCharacter(method, opts = {}) {
     statsOrder: roleData.statsOrder,
     hp: calcHP(gen.stats.BODY, gen.stats.WILL),
     hum: gen.stats.EMP * 10,
-    skills: rollSkills(roleData),
+    skills: buildFullSkillList(rollSkills(roleData)),
     lifepath: LIFE_PATH.map((lp) => ({ label: lp.label, icon: lp.icon, value: pick(lp.items) })),
     gear: GEAR_BY_ROLE[roleData.role] || GEAR_BY_ROLE.default,
     cash: 100 + Math.floor(Math.random() * 900) * 5
@@ -256,10 +273,24 @@ function skillRowHtml(s, i, c) {
 
 function renderSkillsTable(c) {
   const body = $("skills-body");
-  body.innerHTML = c.skills
-    .slice()
-    .sort((a, b) => b.level - a.level)
-    .map((s) => skillRowHtml(s, c.skills.indexOf(s), c))
+  // ВАЖНО: рисуем ВСЕ навыки из справочника data/skills.js (навыки роли —
+  // с распределёнными уровнями, остальные — с уровнем 0). Индекс навыка
+  // фиксируется ДО сортировки (через map((s, i) => ({ s, i }))), чтобы строки
+  // не терялись и уровень правился у нужного навыка. Сортировка
+  // «по убыванию уровня» — только визуальная (стабильная).
+  const rows = c.skills.map((s, i) => ({ s, i })).sort((a, b) => b.s.level - a.s.level || a.i - b.i);
+  // Группируем отсортированные строки по категориям навыков (Core Rulebook, стр. 82–85)
+  const byGroup = new Map();
+  for (const r of rows) {
+    const g = SKILL_BY_NAME[r.s.name]?.group || "Прочее";
+    if (!byGroup.has(g)) byGroup.set(g, []);
+    byGroup.get(g).push(r);
+  }
+  body.innerHTML = [...byGroup.entries()]
+    .map(([g, list]) =>
+      `<tr class="skill-group"><td colspan="4">${GROUP_RU[g] || g} <span class="cnt">(${list.length})</span></td></tr>` +
+      list.map(({ s, i }) => skillRowHtml(s, i, c)).join("")
+    )
     .join("");
 
   // при изменении уровня — обновляем данные персонажа и пересобираем таблицу
@@ -411,7 +442,7 @@ function init() {
     if (!ROLES.some((x) => x.role === sel.value)) sel.value = r.role;
     $("role-info").innerHTML =
       `<p><b>Роль:</b> ${ROLE_RU[r.role]}</p>
-       <p><b>Навыки роли:</b> ${r.skills.map(skillRu).slice(0, 6).join(", ")}…</p>
+       <p><b>Навыки роли (${r.skills.length}):</b> ${r.skills.map(skillRu).join(", ")}</p>
        <p class="muted">Таблица шаблонов: 10 строк × 10 характеристик (Core Rulebook, стр. 74–77).</p>`;
     if (!$("buy-box").classList.contains("hidden")) openBuyPanel();
   });

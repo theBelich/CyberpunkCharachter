@@ -224,6 +224,12 @@ table.skills th {
 }
 table.skills td { padding: 4px 6px; border-top: 1px solid rgba(42,42,58,.6); }
 table.skills tr.zero td { color: #55556a; }
+/* заголовок группы навыков (Восприятие / Тело / …) */
+table.skills tr.skill-group td {
+  color: var(--cyan); font-weight: 800; font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; padding-top: 10px; background: rgba(0,229,255,.05);
+}
+table.skills tr.skill-group td .cnt { color: var(--muted); font-weight: 600; }
 table.skills td.attr-tag { color: var(--cyan); font-size: 10px; text-align: center; width: 42px; }
 table.skills td.lvl {
   text-align: center; width: 36px; font-weight: 800; color: #fff;
@@ -240,7 +246,10 @@ table.skills input.lvl-input {
 table.skills input.lvl-input:focus { outline: none; border-color: var(--red); }
 @media print { table.skills input.lvl-input { border: none; background: transparent; } }
 
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+/* Навыки занимают всю ширину панели: две колонки внутри skills-wrap,
+   поэтому список навыков помещается целиком и ничего не обрезается. */
+.panel.two-col > div:first-child { grid-column: 1 / -1; }
 @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
 ul.list { margin: 0; padding-left: 18px; font-size: 13px; }
 ul.list li { margin: 3px 0; }
