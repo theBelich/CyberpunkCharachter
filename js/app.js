@@ -435,9 +435,15 @@ function createCharacter(method, opts = {}) {
     // Жизненный путь: ручной выбор (если заполнен) или случайная генерация
     lifepath: buildLifepathOnCreate(roleData.role),
     gear: GEAR_BY_ROLE[roleData.role] || GEAR_BY_ROLE.default,
-    cash: 100 + Math.floor(Math.random() * 900) * 5
+    cash: 100 + Math.floor(Math.random() * 900) * 5,
+    // Заметки игрока: черновик из поля справа (или сохранённые по ключу персонажа)
+    notes: (() => {
+      const ta = $("inp-notes");
+      return (ta && ta.value.trim()) ? ta.value : notesGet(`${NOTES_LS_KEY}:${(id.name || "").trim().toLowerCase()}:${roleData.role}`);
+    })()
   };
   current = c;
+  loadNotes();   // показать в поле заметки нового персонажа
   lpManualPicks = {};   // черновик пути больше не нужен
   if (lpEditorOpen) renderLpEditor();
   renderSheet(c);
@@ -1059,6 +1065,9 @@ function loadSaved() {
 }
 function saveCharacter() {
   if (!current) return toast("Сначала создайте персонажа!");
+  // Актуализируем заметки из поля перед сохранением
+  const ta = $("inp-notes");
+  if (ta) current.notes = ta.value;
   const list = loadSaved();
   list.unshift(current);
   localStorage.setItem(LS_KEY, JSON.stringify(list.slice(0, 20)));
@@ -1083,7 +1092,11 @@ function renderSaved() {
       </div>`)
     .join("");
   box.querySelectorAll("[data-load]").forEach((b) =>
-    b.addEventListener("click", () => { current = loadSaved()[Number(b.dataset.load)]; renderSheet(current); }));
+    b.addEventListener("click", () => {
+      current = loadSaved()[Number(b.dataset.load)];
+      renderSheet(current);
+      loadNotes();   // заметки открытого персонажа — в поле справа
+    }));
   box.querySelectorAll("[data-del]").forEach((b) =>
     b.addEventListener("click", () => {
       const list = loadSaved();
@@ -1106,6 +1119,9 @@ function doExport(fmt) {
   if (!current) return toast("Сначала создайте или откройте персонажа!");
   try {
     let blob, ext = fmt;
+    // заметки всегда актуальны на момент экспорта
+    const taN = $("inp-notes");
+    if (taN) current.notes = taN.value;
     if (fmt === "json") {
       blob = exportJSON(current);
     } else if (fmt === "xlsx") {
@@ -1156,6 +1172,77 @@ function importFromJSONFile(file) {
 }
 
 // ------------------------------------------------------------
+// ЗАМЕТКИ ИГРОКА — правая колонка (aside.notes-col)
+// Хранятся в localStorage: отдельно по каждому персонажу
+// (ключ cp-red-notes:<имя>:<роль>) и как общий «черновик»
+// (cp-red-notes:draft), чтобы записи не терялись между листами.
+// При сохранении/экспорте персонажа текст попадает в c.notes.
+// ------------------------------------------------------------
+const NOTES_LS_KEY = "cp-red-notes";
+let notesSaveTimer = null;
+
+function notesDraftKey() { return `${NOTES_LS_KEY}:draft`; }
+function notesCharKey(c) {
+  if (!c) return notesDraftKey();
+  return `${NOTES_LS_KEY}:${(c.name || "").trim().toLowerCase()}:${c.role || ""}`;
+}
+function notesGet(key) { try { return localStorage.getItem(key) || ""; } catch { return ""; } }
+function notesSet(key, val) { try { localStorage.setItem(key, val); } catch { /* приватный режим */ } }
+
+function updateNotesStatus() {
+  const el = $("notes-status");
+  if (!el) return;
+  const ta = $("inp-notes");
+  const text = ta ? ta.value : "";
+  const words = (text.trim().match(/\S+/g) || []).length;
+  el.textContent = text.trim()
+    ? `${words} слов · ${text.length} симв.`
+    : "Пусто";
+}
+
+// Загрузить заметки в поле: сначала для текущего персонажа,
+// если у него их нет — общий черновик
+function loadNotes() {
+  const ta = $("inp-notes");
+  if (!ta) return;
+  let text = current ? (current.notes || notesGet(notesCharKey(current))) : "";
+  if (!text && current) text = notesGet(notesCharKey(current));
+  if (!text) text = notesGet(notesDraftKey());
+  ta.value = text || "";
+  updateNotesStatus();
+}
+
+// Автосохранение с небольшой задержкой (debounce 400 мс)
+function saveNotesSoon() {
+  const ta = $("inp-notes");
+  if (!ta) return;
+  const text = ta.value;
+  if (current) current.notes = text;         // прикреплена к персонажу в памяти
+  clearTimeout(notesSaveTimer);
+  notesSaveTimer = setTimeout(() => {
+    notesSet(notesDraftKey(), text);          // общий черновик
+    if (current && text) notesSet(notesCharKey(current), text);
+    updateNotesStatus();
+  }, 400);
+}
+
+function initNotes() {
+  const ta = $("inp-notes");
+  if (!ta) return;
+  loadNotes();
+  ta.addEventListener("input", saveNotesSoon);
+  $("btn-notes-clear")?.addEventListener("click", () => {
+    if (ta.value.trim() && !confirm("Очистить все заметки?")) return;
+    ta.value = "";
+    if (current) current.notes = "";
+    notesSet(notesDraftKey(), "");
+    if (current) notesSet(notesCharKey(current), "");
+    updateNotesStatus();
+    toast("Заметки очищены");
+  });
+}
+
+// ------------------------------------------------------------
 // Toast
 // ------------------------------------------------------------
 let toastTimer = null;
@@ -1165,6 +1252,79 @@ function toast(msg) {
   t.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+// ------------------------------------------------------------
+// Магазины: кнопка «Открыть магазин» и модальное окно выбора
+// Данные — src/shops/*.js (SHOPS), таблицы Core Rulebook, Night Market Appendix
+// ------------------------------------------------------------
+let shopCurrent = null; // выбранный магазин (объект из SHOPS)
+
+function openShopModal() {
+  const m = $("shop-modal");
+  if (!m) return;
+  renderShopPicker();
+  showShopCatalog(false);
+  m.classList.remove("hidden");
+  document.body.classList.add("shop-open");
+}
+
+function closeShopModal() {
+  const m = $("shop-modal");
+  if (!m) return;
+  m.classList.add("hidden");
+  document.body.classList.remove("shop-open");
+  shopCurrent = null;
+}
+
+function showShopCatalog(show) {
+  $("shop-picker")?.classList.toggle("hidden", show);
+  $("shop-catalog")?.classList.toggle("hidden", !show);
+}
+
+// Шаг 1: пять карточек магазинов на выбор
+function renderShopPicker() {
+  const wrap = $("shop-cards");
+  if (!wrap) return;
+  wrap.innerHTML = SHOPS.map((s, i) => `
+    <button class="shop-card" type="button" data-shop-id="${s.id}">
+      <span class="shop-card-icon">${s.icon || "🏪"}</span>
+      <span class="shop-card-num">${i + 1})</span>
+      <span class="shop-card-title">${s.ru}</span>
+      <span class="shop-card-en">${s.en}</span>
+      <span class="shop-card-hint muted small">${s.hint || ""}</span>
+      <span class="shop-card-count muted small">${s.groups.reduce((n, g) => n + g.items.length, 0)} товаров</span>
+    </button>`).join("");
+  wrap.querySelectorAll(".shop-card").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      shopCurrent = SHOPS.find((s) => s.id === btn.dataset.shopId) || null;
+      if (shopCurrent) { renderShopCatalog(shopCurrent); showShopCatalog(true); }
+    });
+  });
+}
+
+// Шаг 2: каталог выбранного магазина (группы + товары из PDF-таблиц)
+function renderShopCatalog(shop) {
+  $("shop-crumb-name").textContent = `${shop.icon || ""} ${shop.ru}`;
+  $("shop-src").textContent = shop.src || "";
+  const tierRu = { Cheap: "дёшево", Everyday: "обычно", Premium: "премиум", Expensive: "дорого", Illicit: "нелегально" };
+  $("shop-groups").innerHTML = shop.groups.map((g) => `
+    <section class="shop-group">
+      <h3 class="shop-group-title">${g.title}</h3>
+      <div class="shop-items">
+        ${g.items.map((it) => `
+          <div class="shop-item">
+            <div class="shop-item-main">
+              <span class="shop-item-name">${it.ru || it.name}${it.name && it.ru ? ` <small class="muted">(${it.name})</small>` : ""}</span>
+              <span class="shop-item-meta muted small">
+                ${it.tier ? `«${tierRu[it.tier] || it.tier}»` : ""}${it.install ? ` · установка: ${it.install}` : ""}${it.hl ? ` · −${it.hl} HL` : ""}${it.unit ? ` · ${it.unit}` : ""} · стр. ${it.page}
+              </span>
+              ${it.desc ? `<span class="shop-item-desc muted small">${it.desc}</span>` : ""}
+            </div>
+            <span class="shop-item-cost">${Number(it.cost).toLocaleString("ru-RU")} eb</span>
+          </div>`).join("")}
+      </div>
+    </section>`).join("");
 }
 
 // ------------------------------------------------------------
@@ -1240,6 +1400,16 @@ function init() {
   $("btn-save").addEventListener("click", saveCharacter);
   $("btn-print").addEventListener("click", () => window.print());
 
+  // Магазин: кнопка в шапке открывает модальное окно выбора магазина
+  $("btn-shop")?.addEventListener("click", openShopModal);
+  $("shop-back")?.addEventListener("click", () => showShopCatalog(false));
+  // закрытие: крестик, клик по затемнению, кнопки с data-shop-close, Esc
+  document.querySelectorAll("[data-shop-close]").forEach((el) =>
+    el.addEventListener("click", closeShopModal));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("shop-modal")?.classList.contains("hidden")) closeShopModal();
+  });
+
   // Экспорт в .xlsx / .pdf / .json
   $("btn-export-xlsx")?.addEventListener("click", () => doExport("xlsx"));
   $("btn-export-pdf")?.addEventListener("click", () => doExport("pdf"));
@@ -1264,6 +1434,7 @@ function init() {
   });
 
   renderSaved();
+  initNotes();   // поле заметок игрока (правая колонка)
   sel.dispatchEvent(new Event("change"));
 
   // Жизненный путь: сгенерировать случайно / выбрать вручную

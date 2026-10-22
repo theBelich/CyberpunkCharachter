@@ -18,6 +18,7 @@
       <small>Лист персонажа · Найт-Сити 2045 · данные: Data/Cyberpunk Red Core Rulebook v1.25.pdf</small>
     </div>
     <div class="head-actions">
+      <button class="btn primary" id="btn-shop" type="button" title="Открыть магазин Найт-Сити: киберимпланты, оружие, расходники, бакалея, одежда">🛒 Открыть магазин</button>
       <button class="btn ghost" id="btn-print" type="button">Печать</button>
       <button class="btn" id="btn-save" type="button">Сохранить</button>
     </div>
@@ -244,7 +245,50 @@
         </footer>
       </article>
     </section>
+
+    <!-- ===== Поле заметок игрока (правая колонка) ===== -->
+    <aside class="notes-col" aria-label="Заметки игрока">
+      <section class="mode-panel notes-panel">
+        <h2>📝 Заметки игрока</h2>
+        <p class="muted small">Личный блокнот: квесты, контакты, инвентарь, планы. Сохраняется в браузере (localStorage).</p>
+        <textarea id="inp-notes" class="notes-area" rows="18" spellcheck="false"
+                  placeholder="Записи персонажа&#10;&#10;— Заказчик: ...&#10;— Цель: ...&#10;— Долги: ..."></textarea>
+        <div class="notes-meta">
+          <span class="small muted" id="notes-status">Пусто</span>
+          <span class="notes-actions">
+            <button class="btn tiny ghost" id="btn-notes-clear" type="button" title="Очистить все заметки">✕ Очистить</button>
+          </span>
+        </div>
+      </section>
+    </aside>
   </main>
+
+  <!-- ===== Модальное окно «Магазины Найт-Сити» ===== -->
+  <div class="shop-modal hidden" id="shop-modal" role="dialog" aria-modal="true" aria-labelledby="shop-modal-title">
+    <div class="shop-backdrop" data-shop-close></div>
+    <div class="shop-dialog">
+      <header class="shop-head">
+        <h2 id="shop-modal-title">🛒 Магазины Найт-Сити</h2>
+        <button class="btn tiny ghost" id="shop-close-top" type="button" data-shop-close aria-label="Закрыть окно магазинов">✕ Закрыть</button>
+      </header>
+
+      <!-- Шаг 1: выбор одного из пяти магазинов -->
+      <section class="shop-picker" id="shop-picker" aria-label="Выбор магазина">
+        <p class="muted small">Выберите магазин — данные взяты из таблиц Core Rulebook (Night Market Appendix).</p>
+        <div class="shop-cards" id="shop-cards"><!-- заполняется из SHOPS --></div>
+      </section>
+
+      <!-- Шаг 2: каталог выбранного магазина -->
+      <section class="shop-catalog hidden" id="shop-catalog" aria-label="Каталог магазина">
+        <div class="shop-crumbs">
+          <button class="btn tiny ghost" id="shop-back" type="button">← Все магазины</button>
+          <span class="shop-crumb-name" id="shop-crumb-name"></span>
+          <span class="muted small" id="shop-src"></span>
+        </div>
+        <div class="shop-groups" id="shop-groups"><!-- категории и товары --></div>
+      </section>
+    </div>
+  </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
