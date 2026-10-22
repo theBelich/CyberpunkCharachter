@@ -297,34 +297,44 @@ table.skills input.lvl-input:focus { outline: none; border-color: var(--red); }
 
 /* ---------- умения: сетка скруглённых карточек по группам ---------- */
 .skills-wrap { display: block; } /* группы умений занимают всю ширину панели */
-/* Masonry-раскладка: карточки групп заполняют пространство целиком, без
-   пустот («хвостов» в конце ряда) и без наездов. Базовая раскладка —
-   многостолбцовый CSS-поток (column-count: число колонок задаёт JS через
-   --sg-cols). Поверх него JS-раскладчик (js/app.js, applySkillGroupsLayout)
-   выполняет балансировку «в самую короткую колонку»: переставляет карточки
-   в DOM и точечно поднимает низ самых длинных колонок переменными
-   --sg-shift/--sg-shrink, поэтому все колонки заканчиваются почти на одной
-   линии. Карточки остаются в обычном потоке колонок — наехать друг на
-   друга они физически не могут. */
+/* Masonry-раскладка: карточки групп плавно занимают всё пространство без
+   пустот («хвостов» внизу колонок) и без наездов. JS-раскладчик
+   (js/app.js, applySkillGroupsLayout) — единственный источник геометрии:
+   измеряет честные высоты карточек, распределяет их жадным masonry «в самую
+   короткую колонку» и выдаёт каждой карточке координаты --sg-x/--sg-y и
+   ширину колонки --sg-w. Карточки позиционированы абсолютно внутри
+   .skill-groups (position:relative), поэтому не могут ни наехать друг на
+   друга (координаты считаются из одной модели), ни оставить пустоту в конце
+   ряда (низ колонок выравнивается). Плавность переездов — CSS-transition по
+   transform + FLIP-инверсия в JS. */
 .skill-groups {
   --sg-cols: 1;
   --sg-gap: 14px;
-  display: block;
-  column-count: var(--sg-cols);
-  column-gap: var(--sg-gap);
+  position: relative;           /* зона для абсолютно позиционированных карточек */
+  display: block;               /* НЕ grid и НЕ column-flow: позиции задаёт JS */
 }
 .skill-group-card {
+  position: absolute;           /* координаты выдаёт JS (masonry-раскладчик) */
+  left: var(--sg-x, 0px);
+  top: var(--sg-y, 0px);
+  width: var(--sg-w, 100%);     /* ширина колонки — одна на всех, без % от контейнера */
+  margin: 0;
   border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--panel-2); overflow: hidden;
-  display: inline-block;      /* надёжно для многоколоночного потока */
-  width: 100%;
-  margin: 0 0 calc(var(--sg-gap) + var(--sg-shrink, 0px));
-  transform: translateY(calc(var(--sg-shift, 0px) + var(--sg-drop, 0px)));
-  transition: transform .35s ease;
-  break-inside: avoid;        /* карточка не разрывается между колонками */
-  page-break-inside: avoid;
 }
-.skill-group-card:last-child { margin-bottom: calc(var(--sg-shrink, 0px)); }
+/* до первой раскладки JS карточки стоят в обычном потоке (stack fallback),
+   чтобы лист был читаем даже при выключенном/ошибочном скрипте */
+.skill-groups:not(.sg-ready) .skill-group-card {
+  position: static;
+  width: auto;
+  margin-bottom: var(--sg-gap);
+}
+@media print {
+  /* печать/PDF: абсолютные координаты masonry не переносит по страницам —
+     возвращаем карточки в обычный поток */
+  .skill-group-card { position: static !important; width: auto !important; margin-bottom: var(--sg-gap); }
+  .skill-groups { min-height: 0 !important; }
+}
 .skill-group-head {
   display: flex; align-items: center; gap: 8px; width: 100%;
   background: rgba(0,229,255,.06); border: none; border-bottom: 1px solid var(--line);
