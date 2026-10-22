@@ -58,14 +58,271 @@ const NICKS = ["Призрак","Кобра","Искра","Ворон","Стал
 const STYLES = ["неон и хром", "рваный гранж", "строгий корпоративный крой", "панк-латка на куртке",
   "тактические разгрузки", "яркая безумная раскраска", "кожа, шипы, цепи", "дождевые пончо и маски"];
 
-const LIFE_PATH = [
-  { label: "Дом", icon: "🏚️", items: ["трущобы Уэстсайда", "пригород Бадландс", "община кочевников", "корпоративный квартал Пиквика", "плавучий дом в доках"] },
-  { label: "Значимое событие", icon: "💥", items: ["четвёртая корпоративная война", "пожар в Найт-Сити", "эпидемия киберпсихоза", "зачистка банд", "прорыв Кокпита"] },
-  { label: "Проблемы", icon: "⚠️", items: ["долг фиксеру", "розыск корпорации", "зависимость от чипов", "предательство близкого человека", "метка банды"] },
-  { label: "Черта личности", icon: "🎭", items: ["циничный прагматик", "верный до конца", "одержимый справедливостью", "азартный авантюрист", "замкнутый профессионал"] },
-  { label: "Контакты", icon: "🤝", items: ["информатор в полиции", "бармен из «Afterlife»", "контрабандист из портов", "нетраннер-наставник", "полеовой медик"] },
-  { label: "Цель", icon: "🎯", items: ["выйти из тени и стать легендой", "найти того, кто предал семью", "сорвать контракт корпорации", "сколотить состояние и уйти на юг", "пережить 2046-й"] }
+// ------------------------------------------------------------
+// ЖИЗНЕННЫЙ ПУТЬ — генерация / выбор по предыстории
+// Пункты общие для всех ролей; варианты («прошлый образ жизни»)
+// подобраны под конкретную роль и её предысторию из Core Rulebook
+// (стр. 74–77). Если у роли нет своих вариантов — берётся общий
+// список (role: null). Бросок 1d10 → вариант из таблицы d10.
+// ------------------------------------------------------------
+const LIFEPATH_FIELDS = [
+  { key: "home",      label: "Дом",                 icon: "🏚️" },
+  { key: "event",     label: "Значимое событие",    icon: "💥" },
+  { key: "trouble",   label: "Проблемы",            icon: "⚠️" },
+  { key: "trait",     label: "Черта личности",      icon: "🎭" },
+  { key: "contacts",  label: "Контакты",            icon: "🤝" },
+  { key: "goal",      label: "Цель",                icon: "🎯" }
 ];
+
+const LIFEPATH_OPTIONS = {
+  home: [
+    { role: null,        text: "трущобы Уэстсайда" },
+    { role: null,        text: "пригород Бадландс" },
+    { role: null,        text: "община кочевников на окраине города" },
+    { role: null,        text: "корпоративный квартал Пиквика" },
+    { role: null,        text: "плавучий дом в доках Уотчтотера" },
+    { role: "Solo",      text: "казармы частной военной компании за городом" },
+    { role: "Solo",      text: "съёмная комнатушка рядом с участком наёмников" },
+    { role: "Netrunner", text: "затенённая серверная в подвале сетевой фермы" },
+    { role: "Netrunner", text: "арендованный кокон-капсула в нет-кафе" },
+    { role: "Rockerboy", text: "закулисная комната захудалого клуба «Восход»" },
+    { role: "Rockerboy", text: "коммуна музыкантов в Старом Японском квартале" },
+    { role: "Nomad",     text: "фургон в стойбище клана у дальней дороги" },
+    { role: "Nomad",     text: "лагерь клана на свалке за пределами города" },
+    { role: "Fixer",     text: "квартира над баром, где «все всё знают»" },
+    { role: "Fixer",     text: "офис-контору в деловом районе Хейвуда" },
+    { role: "Tech",      text: "мастерскую-гараж в промышленном Сироу Виллидж" },
+    { role: "Tech",      text: "жилой фургон у свалки запчастей" },
+    { role: "Medtech",   text: "служебное жильё при клинике КорпСек" },
+    { role: "Medtech",   text: "подпольную аптеку-клинику в трущобах" },
+    { role: "Exec",      text: "элитные апартаменты корпоративного сегмента" },
+    { role: "Exec",      text: "закрытый жилой комплекс корпорации" },
+    { role: "Media",     text: "редакцию медиа-холдинга в центре города" },
+    { role: "Media",     text: "студию самодел-вещателя на чердаке" },
+    { role: "Lawman",    text: "казармы при полицейском участке" },
+    { role: "Lawman",    text: "дом в спокойном районе служащих NCPD" },
+    { role: "Solo",      text: "полигон отряда «Грозовых птиц» в муссонных землях" },
+    { role: "Netrunner", text: "пустующий дата-центр под Старым Чинатауном" },
+    { role: "Rockerboy", text: "тур-фургон, что год за годом колесят по Найт-Сити" },
+    { role: "Nomad",     text: "караван-стойбище у границы штата" },
+    { role: "Fixer",     text: "съёмную конспиративную квартиру без контракта" },
+    { role: "Tech",      text: "нефтевышку-скват со станками и хламом" },
+    { role: "Medtech",   text: "полевой медпункт ополчения Лиги свободных штатов" },
+    { role: "Exec",      text: "резиденцию за КПП корпоративного анклава" },
+    { role: "Media",     text: "передвижную студию прямо в гуще событий" },
+    { role: "Lawman",    text: "дом родителей, куда наведываешься только по выходным" }
+  ],
+  event: [
+    { role: null,        text: "четвёртая корпоративная война" },
+    { role: null,        text: "пожар в Найт-Сити" },
+    { role: null,        text: "эпидемия киберпсихоза" },
+    { role: null,        text: "зачистка банд" },
+    { role: null,        text: "прорыв Кокпита" },
+    { role: "Solo",      text: "бой, в котором полежал весь твой отряд" },
+    { role: "Solo",      text: "контракт, после которого тебя отмели из компании" },
+    { role: "Netrunner", text: "обвал Сети во время Прорыва, убивший сотни диверов" },
+    { role: "Netrunner", text: "взлом чёрного ICE, оставивший тебя на грани смерти" },
+    { role: "Rockerboy", text: "последний концерт группы, развалившейся на сцене" },
+    { role: "Rockerboy", text: "восстание фанатов, подавленное КорпСек" },
+    { role: "Nomad",     text: "гибель отца на трассе — клан отвернулся от тебя" },
+    { role: "Nomad",     text: "раскол клана из-за сделки с чужаками" },
+    { role: "Fixer",     text: "крах большой сделки, стоивший тебе репутации" },
+    { role: "Fixer",     text: "война банд за твои территории" },
+    { role: "Tech",      text: "авария твоего же изобретения, покалечившая людей" },
+    { role: "Tech",      text: "пожар на складе корпорации, в котором ты спас соседей" },
+    { role: "Medtech",   text: "триаж после прорыва Кокпита, изменивший твой взгляд на жизнь" },
+    { role: "Medtech",   text: "вспышку киберпсихоза в твоей клинике" },
+    { role: "Exec",      text: "кадровую чистку, съевшую половину твоего отдела" },
+    { role: "Exec",      text: "утечку данных, за которую поплатился твой наставник" },
+    { role: "Media",     text: "репортаж, из-за которого тебя вышвырнули из редакции" },
+    { role: "Media",     text: "цензуру сюжета, который мог бы остановить войну" },
+    { role: "Lawman",    text: "дело о коррупции внутри NCPD, стоившее напарнику жизни" },
+    { role: "Lawman",    text: "мятеж в блок-блоке, после которого ты ушёл со службы" },
+    { role: "Solo",      text: "зачистку трущоб, где ты впервые взял в руки оружие" },
+    { role: "Netrunner", text: "первый успешный пролом корпоративного Даркнет-узла" },
+    { role: "Rockerboy", text: "выступление на площади, собравшее тысячи голосов" },
+    { role: "Nomad",     text: "переход через границу под обстрелом корпоративных дронов" },
+    { role: "Fixer",     text: "смерть твоего ментора — и наследство его контактов" },
+    { role: "Tech",      text: "утилизацию военного лома, давшую старт твоей карьере" },
+    { role: "Medtech",   text: "экспериментальный имплант, спасший тебе жизнь" },
+    { role: "Exec",      text: "перевод в найт-ситский филиал в разгар войны" },
+    { role: "Media",     text: "публикацию списков погибших, сделавшую тебя известным" },
+    { role: "Lawman",    text: "перестрелку у «Afterlife», после которой ты дал присягу заново" }
+  ],
+  trouble: [
+    { role: null,        text: "долг фиксеру" },
+    { role: null,        text: "розыск корпорации" },
+    { role: null,        text: "зависимость от чипов" },
+    { role: null,        text: "предательство близкого человека" },
+    { role: null,        text: "метка банды" },
+    { role: "Solo",      text: "шрам и контракт, из-за которых тебя узнают на улицах" },
+    { role: "Solo",      text: "встряхивающий синдром после слишком многих боёв" },
+    { role: "Netrunner", text: "обугленный мозг после перегрузки в Сети" },
+    { role: "Netrunner", text: "долг за кибердеку перед очень терпеливым кредитором" },
+    { role: "Rockerboy", text: "голос, который подводит тебя в самый неподходящий момент" },
+    { role: "Rockerboy", text: "славу, из-за которой тебя не оставляют в покое фанаты и охотники" },
+    { role: "Nomad",     text: "кровную месть между кланами" },
+    { role: "Nomad",     text: "прописку в чёрном списке всех КПП города" },
+    { role: "Fixer",     text: "сорванный контракт на огромные деньги" },
+    { role: "Fixer",     text: "слишком длинные списки должников и кредиторов" },
+    { role: "Tech",      text: "прототип, который кто-то очень хочет получить назад" },
+    { role: "Tech",      text: "кредит под залог всей твоей мастерской" },
+    { role: "Medtech",   text: "лицензию, отобранную корпоративной клиникой" },
+    { role: "Medtech",   text: "пациента, умершего на твоём столе" },
+    { role: "Exec",      text: "внутреннее расследование против тебя" },
+    { role: "Exec",      text: "должность, за которую соперники готовы убить" },
+    { role: "Media",     text: "иск о диффамации от корпорации" },
+    { role: "Media",     text: "компромат на тебя у того, кого ты копал" },
+    { role: "Lawman",    text: "подозрение в связях с бандой" },
+    { role: "Lawman",    text: "ордер на тебя за приказ, в котором ты отказал" },
+    { role: "Solo",      text: "психологический порог: ещё один срыв — и киберпсихоз" },
+    { role: "Netrunner", text: "ловушку-чёрный ICE, оставившую след в твоей психике" },
+    { role: "Rockerboy", text: "бывшего продюсера с правами на твои песни" },
+    { role: "Nomad",     text: "больного ребёнка, ради лечения которого нужны деньги" },
+    { role: "Fixer",     text: "понимающего слишком много свидетеля" },
+    { role: "Tech",      text: "украденные чертежи твоей лучшей работы" },
+    { role: "Medtech",   text: "дефицит стима и медикаментов в твоей клинике" },
+    { role: "Exec",      text: "внебрачного ребёнка в Найт-Сити" },
+    { role: "Media",     text: "источник, который теперь считает тебя предателем" },
+    { role: "Lawman",    text: "журнал дел, которые ты вёл в обход начальства" }
+  ],
+  trait: [
+    { role: null,        text: "циничный прагматик" },
+    { role: null,        text: "верный до конца" },
+    { role: null,        text: "одержимый справедливостью" },
+    { role: null,        text: "азартный авантюрист" },
+    { role: null,        text: "замкнутый профессионал" },
+    { role: "Solo",      text: "хладнокровие перед лицом огня" },
+    { role: "Solo",      text: "дисциплина, выжженная армейской муштрой" },
+    { role: "Netrunner", text: "терпение охотника, ждущего жертву в Сети" },
+    { role: "Netrunner", text: "паранойя: каждый узел может оказаться ловушкой" },
+    { role: "Rockerboy", text: "бунт как образ мысли" },
+    { role: "Rockerboy", text: "харизма, зажигающая толпу с полувзгляда" },
+    { role: "Nomad",     text: "семья и клан выше любых законов" },
+    { role: "Nomad",     text: "дорога важнее любой точки на карте" },
+    { role: "Fixer",     text: "улыбка и долгая память на услуги" },
+    { role: "Fixer",     text: "словесная дуэль вместо огневой" },
+    { role: "Tech",      text: "любая поломка — личный вызов" },
+    { role: "Tech",      text: "руки чище, чем совесть" },
+    { role: "Medtech",   text: "клятву не бросать раненых не нарушаешь" },
+    { role: "Medtech",   text: "хладнокровие скальпеля посреди хаоса" },
+    { role: "Exec",      text: "вежливость как броня" },
+    { role: "Exec",      text: "цифры и отчёты вместо чувств" },
+    { role: "Media",     text: "нюх на правду, какой бы она ни была" },
+    { role: "Media",     text: "камера впереди совести" },
+    { role: "Lawman",    text: "закон буквенный, не духовный" },
+    { role: "Lawman",    text: "код молчания в отделении" },
+    { role: "Solo",      text: "профессионализм: контракт святое" },
+    { role: "Netrunner", text: "цифровой аскетизм: мир реален меньше Сети" },
+    { role: "Rockerboy", text: "громче всех — значит ближе к истине" },
+    { role: "Nomad",     text: "гостеприимство костра для каждого попутчика" },
+    { role: "Fixer",     text: "нейтральность до последней эдди" },
+    { role: "Tech",      text: "вера в железо сильнее веры в людей" },
+    { role: "Medtech",   text: "усталость ангела на поле боя" },
+    { role: "Exec",      text: "лояльность корпорации превыше родных" },
+    { role: "Media",     text: "вопрос-нож: режешь им каждую беседу" },
+    { role: "Lawman",    text: "значок помнишь, даже когда снял форму" }
+  ],
+  contacts: [
+    { role: null,        text: "информатор в полиции" },
+    { role: null,        text: "бармен из «Afterlife»" },
+    { role: null,        text: "контрабандист из портов" },
+    { role: null,        text: "нетраннер-наставник" },
+    { role: null,        text: "полеовой медик" },
+    { role: "Solo",      text: "офицер вербовки ЧВК «Микрон-Индастриз»" },
+    { role: "Solo",      text: "старый сержант, держащий очередь на контракты" },
+    { role: "Netrunner", text: "владелец нет-кафе с «чистой» линией" },
+    { role: "Netrunner", text: "торговец кодеками на чёрном рынке Даркнета" },
+    { role: "Rockerboy", text: "звукарь легендарного клуба «Восход»" },
+    { role: "Rockerboy", text: "диджей пиратской радиостанции LPFM" },
+    { role: "Nomad",     text: "диспетчер грузов на дальних маршрутах" },
+    { role: "Nomad",     text: "вожак соседнего клана, обязанный тебе кровью" },
+    { role: "Fixer",     text: "посредник картеля «О'Тул»" },
+    { role: "Fixer",     text: "секретарша корпоративного юриста" },
+    { role: "Tech",      text: "владелец ломбарда запчастей в Сироу" },
+    { role: "Tech",      text: "инженер-перебежчик с завода Militech" },
+    { role: "Medtech",   text: "фельдшер скорой, закрывающий глаза на «серых» пациентов" },
+    { role: "Medtech",   text: "фармацевт, торгующий стимом из-под прилавка" },
+    { role: "Exec",      text: "помощник вице-президента филиала" },
+    { role: "Exec",      text: "корпоративный аудитор с договорными интересами" },
+    { role: "Media",     text: "продюсер новостного канала KJJK" },
+    { role: "Media",     text: "хактивист-видеографщик из подполья" },
+    { role: "Lawman",    text: "детектив из отдела по тяжким" },
+    { role: "Lawman",    text: "прокурор, ведущий «нужные» дела" },
+    { role: "Solo",      text: "медик подпольной клиники для наёмников" },
+    { role: "Netrunner", text: "брокер данных с безупречной анонимностью" },
+    { role: "Rockerboy", text: "менеджер тура с деньгами «на чёрный день»" },
+    { role: "Nomad",     text: "механик-самоделкин с золотыми руками" },
+    { role: "Fixer",     text: "легендарный фиксер-ветеран на пенсии" },
+    { role: "Tech",      text: "контрабандист военных комплектующих" },
+    { role: "Medtech",   text: "киберврач, ставящий импланты без лицензии" },
+    { role: "Exec",      text: "дворецкий особняка, слышавший слишком много" },
+    { role: "Media",     text: "фотограф таблоида, вечно в долгу у тебя" },
+    { role: "Lawman",    text: "коп-одиночка, которому можно позвонить ночью" }
+  ],
+  goal: [
+    { role: null,        text: "выйти из тени и стать легендой" },
+    { role: null,        text: "найти того, кто предал семью" },
+    { role: null,        text: "сорвать контракт корпорации" },
+    { role: null,        text: "сколотить состояние и уйти на юг" },
+    { role: null,        text: "пережить 2046-й" },
+    { role: "Solo",      text: "собрать собственный отряд и диктовать цену контрактам" },
+    { role: "Solo",      text: "закрыть последний контракт и уйти живым" },
+    { role: "Netrunner", text: "пробиться в Даркнет и найти то, что скрыли корпорации" },
+    { role: "Netrunner", text: "отмыть своё имя в Сети после ложного взлома" },
+    { role: "Rockerboy", text: "собрать стадион и спеть песню, которая изменит всё" },
+    { role: "Rockerboy", text: "разжечь восстание одним только словом и рифом" },
+    { role: "Nomad",     text: "собрать рассеянный клан обратно на большую дорогу" },
+    { role: "Nomad",     text: "провезти груз через все КПП и вернуть себе имя" },
+    { role: "Fixer",     text: "стать главным фиксером Найт-Сити" },
+    { role: "Fixer",     text: "провернуть сделку, после которой долги простят сами" },
+    { role: "Tech",      text: "построить машину, которую невозможно украсть" },
+    { role: "Tech",      text: "открыть мастерскую, куда пускают даже уличных крыс" },
+    { role: "Medtech",   text: "построить бесплатную клинику для трущоб" },
+    { role: "Medtech",   text: "найти лекарство от последствий киберпсихоза" },
+    { role: "Exec",      text: "дослужиться до совета директоров" },
+    { role: "Exec",      text: "уволиться в собственное дело и дышать свободно" },
+    { role: "Media",     text: "опубликовать правду, которую прячут все корпорации" },
+    { role: "Media",     text: "вернуться в большое радио со своим шоу" },
+    { role: "Lawman",    text: "доказать коррупцию в собственных рядах" },
+    { role: "Lawman",    text: "получить значок детектива и вести свои дела" },
+    { role: "Solo",      text: "найти того, кто сдал твой отряд" },
+    { role: "Netrunner", text: "создать сеть-убежище для таких, как ты" },
+    { role: "Rockerboy", text: "записать альбом, который переживёт тебя" },
+    { role: "Nomad",     text: "увести семью из-под удара корпоративных зачистщиков" },
+    { role: "Fixer",     text: "сыграть на оперение две враждующие стороны" },
+    { role: "Tech",      text: "восстановить довоенный прототип по крупицам" },
+    { role: "Medtech",   text: "вернуть лицензию и право работать при свете дня" },
+    { role: "Exec",      text: "вывести из корпорации компромат на себя" },
+    { role: "Media",     text: "заставить замолчать тех, кто платит за ложь" },
+    { role: "Lawman",    text: "закрыть дело, которое сломало твоего напарника" }
+  ]
+};
+
+// Все варианты поля, подходящие данной роли (свои + общие)
+function lifepathOptionsFor(fieldKey, roleName) {
+  const all = LIFEPATH_OPTIONS[fieldKey] || [];
+  return all.filter((o) => !o.role || o.role === roleName);
+}
+
+// Один пункт пути: результат броска 1d10 и текст варианта
+function rollLifepathItem(field, roleName) {
+  const options = lifepathOptionsFor(field.key, roleName);
+  const roll = options.length ? d10() : null;
+  const idx = options.length ? ((roll - 1) % options.length) : 0;
+  const opt = options[idx] || null;
+  return { key: field.key, label: field.label, icon: field.icon, roll, value: opt ? opt.text : "—" };
+}
+
+// Случайный жизненный путь целиком (по предыстории роли)
+function rollLifepath(roleName) {
+  return LIFEPATH_FIELDS.map((f) => rollLifepathItem(f, roleName));
+}
+
+// Текстовое резюме пути — для note и подсказок
+function lifepathSummary(lp) {
+  return lp.map((x) => `${x.label}: ${x.value}`).join(" · ");
+}
 
 const GEAR_BY_ROLE = {
   default: ["кибердека нет (пока)", "броня Light Bodyshell", "комм", "нож", "аптечка первой помощи"],
@@ -203,7 +460,8 @@ function createCharacter(method, opts = {}) {
     hp: calcHP(gen.stats.BODY, gen.stats.WILL),
     hum: gen.stats.EMP * 10,
     skills: buildFullSkillList(rollSkills(roleData)),
-    lifepath: LIFE_PATH.map((lp) => ({ label: lp.label, icon: lp.icon, value: pick(lp.items) })),
+    // Жизненный путь: случайная генерация по предыстории выбранной роли
+    lifepath: rollLifepath(roleData.role),
     gear: GEAR_BY_ROLE[roleData.role] || GEAR_BY_ROLE.default,
     cash: 100 + Math.floor(Math.random() * 900) * 5
   };
@@ -211,6 +469,96 @@ function createCharacter(method, opts = {}) {
   renderSheet(c);
   toast(`${c.name} «${c.nick}» — ${c.roleRu} создан (${METHODS[method].name})`);
   return c;
+}
+
+// ------------------------------------------------------------
+// ЖИЗНЕННЫЙ ПУТЬ — панели «Случайно» / «Выбрать»
+// «Сгенерировать» — бросок 1d10 по таблице вариантов предыстории
+// роли; «Выбрать вручную» — свой вариант для каждого пункта пути.
+// ------------------------------------------------------------
+let lpEditorOpen = false;
+
+// Сохранить/обновить жизненный путь текущего персонажа
+function applyLifepath(lp, msg) {
+  if (!current) { toast("Сначала создайте персонажа!"); return; }
+  current.lifepath = lp;
+  renderSheet(current);
+  if (msg) toast(msg);
+}
+
+// Случайная генерация пути по предыстории роли персонажа
+function generateLifepath() {
+  if (!current) return toast("Сначала создайте персонажа!");
+  applyLifepath(rollLifepath(current.role), "Жизненный путь сгенерирован по предыстории роли");
+}
+
+// Ручная панель выбора: на каждый пункт — выпадающий список подходящих
+// роли вариантов + кнопка «🎲» (переброс одного пункта) и общая кнопка
+// «Применить».
+function toggleLpEditor(force) {
+  if (!current) { toast("Сначала создайте персонажа!"); return; }
+  lpEditorOpen = force ?? !lpEditorOpen;
+  const box = $("lp-editor");
+  if (!box) return;
+  if (!lpEditorOpen) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  renderLpEditor();
+}
+
+function renderLpEditor() {
+  const box = $("lp-editor");
+  if (!box || !current) return;
+  const roleName = current.role;
+  box.innerHTML = `
+    <h3 class="lp-editor-title">Выбор жизненного пути (по предыстории роли «${current.roleRu}»)</h3>
+    <div class="lp-steps">
+      ${LIFEPATH_FIELDS.map((f, i) => {
+        const options = lifepathOptionsFor(f.key, roleName);
+        const cur = current.lifepath.find((x) => x.key === f.key);
+        const curVal = cur ? cur.value : "";
+        const inList = options.some((o) => o.text === curVal);
+        return `
+          <div class="lp-step" data-lp="${i}">
+            <div class="lp-step-label">${f.icon} ${f.label}${cur && cur.roll ? ` <span class="roll">(бросок: ${cur.roll})</span>` : ""}</div>
+            <select class="lp-pick" data-key="${f.key}" aria-label="Выбор: ${f.label}">
+              ${!inList && curVal ? `<option value="${curVal}" selected>${curVal} (своё)</option>` : ""}
+              ${options.map((o) =>
+                `<option value="${o.text}" ${o.text === curVal ? "selected" : ""}>${o.text}</option>`).join("")}
+            </select>
+            <button type="button" class="btn tiny lp-reroll" data-key="${f.key}"
+                    title="Перебросить этот пункт (1d10)">🎲 Бросить</button>
+          </div>`;
+      }).join("")}
+    </div>
+    <div class="gen-row">
+      <button type="button" class="btn primary" id="btn-lp-apply">Применить выбор</button>
+      <button type="button" class="btn" id="btn-lp-roll-all">🎲 Случайно всем пунктам</button>
+    </div>`;
+
+  box.querySelectorAll("select.lp-pick").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const item = current.lifepath.find((x) => x.key === sel.dataset.key);
+      if (item) { item.value = sel.value; item.roll = null; }
+    });
+  });
+  box.querySelectorAll("button.lp-reroll").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const f = LIFEPATH_FIELDS.find((x) => x.key === btn.dataset.key);
+      const rolled = rollLifepathItem(f, current.role);
+      const item = current.lifepath.find((x) => x.key === f.key) || current.lifepath[LIFEPATH_FIELDS.indexOf(f)];
+      Object.assign(item, rolled);
+      renderLpEditor();
+      toast(`${f.label}: ${rolled.value} (выпало ${rolled.roll})`);
+    });
+  });
+  $("btn-lp-apply")?.addEventListener("click", () => {
+    applyLifepath(current.lifepath, "Жизненный путь обновлён: " + lifepathSummary(current.lifepath));
+  });
+  $("btn-lp-roll-all")?.addEventListener("click", () => {
+    current.lifepath = rollLifepath(current.role);
+    renderLpEditor();
+    toast("Все пункты переброшены случайно");
+  });
 }
 
 // ------------------------------------------------------------
@@ -297,11 +645,15 @@ function renderSheet(c) {
 
   renderSkillsTable(c);
 
+  // Жизненный путь: значения + результат броска 1d10 (если пункт выпал случайно)
   $("lifepath").innerHTML = c.lifepath
     .map((lp) => `
       <div class="lp-row">
         <span class="lp-icon">${lp.icon}</span>
-        <span><small>${lp.label}:</small> <p>${lp.value}</p></span>
+        <span>
+          <small>${lp.label}:${lp.roll ? ` <b class="lp-roll">(1d10 = ${lp.roll})</b>` : ""}</small>
+          <p>${lp.value}</p>
+        </span>
       </div>`)
     .join("") + `<p class="small muted" style="margin-top:8px;">${c.note}</p>`;
 
@@ -622,6 +974,10 @@ function init() {
 
   renderSaved();
   sel.dispatchEvent(new Event("change"));
+
+  // Жизненный путь: сгенерировать случайно / выбрать вручную
+  $("btn-lp-roll")?.addEventListener("click", generateLifepath);
+  $("btn-lp-pick")?.addEventListener("click", () => toggleLpEditor());
 }
 
 // Если DOM уже готов — запускаем сразу; иначе ждём DOMContentLoaded
