@@ -21,6 +21,9 @@ import { lawman } from "../src/roles/lawman.js";
 import { SKILLS, SKILL_BY_NAME, SKILL_GROUPS } from "../data/skills.js";
 import { ROLE_ABILITIES } from "../data/role-abilities.js";
 import { buildSheetData, exportJSON, exportXLSX, exportPDF, downloadBlob, parseImportedJSON } from "./exporters.js";
+// Каталог киберимплантов (данные PDF-таблиц) — используется для распознавания
+// имплантов в инвентаре (список «Импланты») и для магазина.
+import { CYBERWARE } from "../src/shops/cyberware.js";
 
 const ROLES = [solo, netrunner, rockerboy, nomad, fixer, tech, medtech, exec, media, lawman];
 
@@ -718,8 +721,58 @@ function renderSheet(c) {
       </div>`)
     .join("") + `<p class="small muted" style="margin-top:8px;">${c.note}</p>`;
 
-  $("gear-list").innerHTML = c.gear.map((g) => `<li>${g}</li>`).join("");
+  // Инвентарь: строки могут быть текстом (снаряжение роли / старые сохранения)
+  // или объектом { name, cost, implant? } — предметы, купленные в магазине.
+  // Киберимпланты (флаг implant:true, ставится при покупке в магазине
+  // «Киберимпланты») выделены в отдельный список под названием «Импланты».
+  const gearItemHtml = (g) => {
+    const isObj = g && typeof g === "object";
+    const label = isObj ? g.name : g;
+    const price = isObj && Number(g.cost) > 0
+      ? ` <b class="gear-cost">(${Number(g.cost).toLocaleString("ru-RU")} eb)</b>` : "";
+    return `<li>${label}${price}</li>`;
+  };
+  const implants = c.gear.filter(isImplantGear);
+  const otherGear = c.gear.filter((g) => !isImplantGear(g));
+  $("gear-list").innerHTML = otherGear.length
+    ? otherGear.map(gearItemHtml).join("")
+    : `<li class="muted">${implants.length ? "Нет обычного снаряжения." : "Нет данных — персонаж ещё не создан."}</li>`;
+  const impBox = $("implants-box");
+  if (impBox) {
+    impBox.classList.toggle("hidden", !implants.length);
+    $("implants-count").textContent = `(${implants.length})`;
+    $("implants-list").innerHTML = implants.map(gearItemHtml).join("");
+  }
   $("ch-cash").textContent = c.cash.toLocaleString("ru-RU") + " эдди";
+}
+
+// -------------------------------------------------------------
+// Импланты — отдельный список на листе персонажа (под инвентарём).
+// Попадает туда любой предмет, купленный в магазине киберимплантов:
+// при покупке в запись инвентаря добавляется флаг implant:true.
+// -------------------------------------------------------------
+const IMPLANT_KEYWORDS = [
+  "оптика", "аудитор", "усилитель голоса", "фильтр", "датчик", "термальн",
+  "анти-вспышк", "детектор", "телефон", "рекордер", "видео", "нейровар",
+  "сокет", "браунер", "чипвар", "тракер", "гидра-г", "скальпель", "кулаки",
+  "бронированн", "кости", "мышц", "сухожили", "легки", "печень", "желудок",
+  "кожа", "кровь", "стайлер", "хром", "шипы", "пластины", "биомонитор",
+  "химскин", "эм-ти", "эмп-нит", "нарни", "уровни", "глаза", "руки",
+];
+// базовое снаряжение ролей (строки GEAR_BY_ROLE) не должно ошибочно попасть
+// в список имплантов по ключевым словам — оно явно перечислено здесь
+const BASE_GEAR_TEXTS = new Set(Object.values(GEAR_BY_ROLE).flat());
+
+function isImplantGear(g) {
+  if (!g || typeof g !== "object") return false;   // обычные строки — не импланты
+  if (g.implant) return true;                      // куплено в магазине киберимплантов
+  // fallback для сохранений, сделанных до появления флага: название из
+  // каталога CYBERWARE («Русское (English Name)») или известный ключевой термин
+  const nm = String(g.name || "").toLowerCase();
+  const en = (nm.match(/\(([^)]+)\)/) || [])[1] || nm;
+  const inCatalog = CYBERWARE.groups.some((gr) => gr.items.some((it) => it.name.toLowerCase() === en.trim()));
+  if (inCatalog) return true;
+  return !BASE_GEAR_TEXTS.has(g.name) && IMPLANT_KEYWORDS.some((k) => nm.includes(k));
 }
 
 // ------------------------------------------------------------
@@ -1303,10 +1356,32 @@ function renderShopPicker() {
   });
 }
 
-// Шаг 2: каталог выбранного магазина (группы + товары из PDF-таблиц)
+// Шаг 2: каталог выбранного магазина (группы + товары из PDF-таблиц).
+// В магазине киберимплантов у каждого товара есть кнопка «💸 Купить»:
+// цена вычитается из наличных персонажа, имплант добавляется в инвентарь;
+// если валюты не хватает — кнопка заблокирована (disabled).
+function canAfford(cost) {
+  return !!current && Number(current.cash) >= Number(cost);
+}
+
+function buyCyberware(item) {
+  if (!current) { toast("Сначала создайте персонажа!"); return; }
+  const cost = Number(item.cost) || 0;
+  if (!canAfford(cost)) { toast(`Недостаточно эдди: нужно ${cost.toLocaleString("ru-RU")}, есть ${Number(current.cash).toLocaleString("ru-RU")}`); return; }
+  current.cash -= cost;
+  // Предмет уходит в инвентарь (объект с названием и ценой — renderSheet это понимает).
+  // Флаг implant:true — основание для отдельного списка «Импланты» на листе.
+  if (!Array.isArray(current.gear)) current.gear = [];
+  current.gear.push({ name: `${item.ru || item.name}${item.name && item.ru ? ` (${item.name})` : ""}`, cost, implant: true });
+  renderSheet(current);           // обновляем лист: наличные + инвентарь
+  renderShopCatalog(shopCurrent); // перерисовываем кнопки (могла закончиться валюта)
+  toast(`Куплено: ${item.ru || item.name} — −${cost.toLocaleString("ru-RU")} eb (остаток ${Number(current.cash).toLocaleString("ru-RU")} eb)`);
+}
+
 function renderShopCatalog(shop) {
   $("shop-crumb-name").textContent = `${shop.icon || ""} ${shop.ru}`;
   $("shop-src").textContent = shop.src || "";
+  const isCyberware = shop.id === "cyberware";
   const tierRu = { Cheap: "дёшево", Everyday: "обычно", Premium: "премиум", Expensive: "дорого", Illicit: "нелегально" };
   $("shop-groups").innerHTML = shop.groups.map((g) => `
     <section class="shop-group">
@@ -1321,10 +1396,26 @@ function renderShopCatalog(shop) {
               </span>
               ${it.desc ? `<span class="shop-item-desc muted small">${it.desc}</span>` : ""}
             </div>
-            <span class="shop-item-cost">${Number(it.cost).toLocaleString("ru-RU")} eb</span>
+            <div class="shop-item-side">
+              <span class="shop-item-cost">${Number(it.cost).toLocaleString("ru-RU")} eb</span>
+              ${isCyberware ? `<button class="btn tiny shop-buy-btn" type="button" data-item-key="${g.title}|||${it.name}"
+                  ${canAfford(it.cost) ? "" : "disabled title=\"Недостаточно эдди\""}>💸 Купить</button>` : ""}
+            </div>
           </div>`).join("")}
       </div>
     </section>`).join("");
+
+  // Навешиваем обработчики на кнопки покупки (делегирование через dataset)
+  if (isCyberware) {
+    $("shop-groups").querySelectorAll(".shop-buy-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const [groupTitle, itemName] = btn.dataset.itemKey.split("|||");
+        const group = shop.groups.find((x) => x.title === groupTitle);
+        const item = group?.items.find((x) => x.name === itemName);
+        if (item) buyCyberware(item);
+      });
+    });
+  }
 }
 
 // ------------------------------------------------------------

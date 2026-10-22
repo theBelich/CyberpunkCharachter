@@ -548,8 +548,24 @@ body.shop-open { overflow: hidden; }
 }
 .shop-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .shop-item-name { font-weight: 600; font-size: 14px; }
+.shop-item-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .shop-item-cost { color: var(--yellow); font-weight: 800; white-space: nowrap; }
+.shop-buy-btn { white-space: nowrap; border-color: var(--red); color: var(--red); }
+.shop-buy-btn:hover:not(:disabled) { background: rgba(255, 0, 60, .12); box-shadow: 0 0 10px rgba(255, 0, 60, .35); }
+.shop-buy-btn:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.6); }
+.gear-cost { color: var(--yellow); font-weight: 700; }
 @media (max-width: 560px) {
   .shop-dialog { max-height: 92vh; }
   .shop-cards { grid-template-columns: 1fr 1fr; }
 }
+
+/* ===== Импланты — отдельный список на листе персонажа ===== */
+.implants-box {
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+.implants-title {
+  margin: 0 0 6px; font-size: 14px; color: var(--yellow);
+  letter-spacing: .03em;
+}
+.implants-list li::marker { color: var(--yellow); }
