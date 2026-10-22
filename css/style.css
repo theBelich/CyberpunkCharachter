@@ -271,6 +271,93 @@ table.skills input.lvl-input {
 table.skills input.lvl-input:focus { outline: none; border-color: var(--red); }
 @media print { table.skills input.lvl-input { border: none; background: transparent; } }
 
+/* ---------- ролевая способность (блок над характеристиками) ---------- */
+.role-ability {
+  border: 1px solid rgba(0,229,255,.35); border-radius: var(--radius);
+  background: linear-gradient(160deg, rgba(0,229,255,.07), rgba(255,0,60,.05));
+  padding: 4px 14px 12px; margin-bottom: 18px;
+}
+.role-ability.hidden { display: none; }
+.role-ability-head {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: transparent; border: none; color: inherit; font: inherit;
+  cursor: pointer; text-align: left; padding: 8px 0 6px;
+}
+.role-ability-head:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 8px; }
+.role-ability-icon { font-size: 22px; line-height: 1; }
+.role-ability-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.role-ability-kicker { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.role-ability-kicker b { color: var(--cyan); }
+.role-ability-name { font-size: 15px; font-weight: 800; color: #fff; }
+.role-ability-en { font-size: 11.5px; color: var(--cyan); }
+.role-ability .collapse-arrow { margin-left: auto; color: var(--cyan); font-size: 15px; transition: transform .2s ease; }
+.role-ability.is-collapsed .collapse-arrow { transform: rotate(-90deg); }
+.role-ability-text { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: var(--text); }
+.role-ability-text.collapsed { display: none; }
+
+/* ---------- умения: сетка скруглённых карточек по группам ---------- */
+.skills-wrap { display: block; } /* группы умений занимают всю ширину панели */
+.skill-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+.skill-group-card {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel-2); overflow: hidden;
+}
+.skill-group-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: rgba(0,229,255,.06); border: none; border-bottom: 1px solid var(--line);
+  color: inherit; font: inherit; cursor: pointer; text-align: left; padding: 10px 12px;
+}
+.skill-group-head:hover { background: rgba(0,229,255,.12); }
+.skill-group-head:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+.sg-title { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); }
+.skill-group-head .cnt { font-size: 11px; color: var(--muted); }
+.sg-preview {
+  flex: 1; min-width: 0; font-size: 11px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; visibility: hidden;
+}
+.skill-group-card.collapsed .sg-preview { visibility: visible; }
+.skill-group-card.collapsed .skill-group-head { border-bottom-color: transparent; }
+.skill-group-card .collapse-arrow { margin-left: auto; color: var(--cyan); font-size: 14px; transition: transform .2s ease; }
+.skill-group-card.collapsed .collapse-arrow { transform: rotate(-90deg); }
+.skill-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 8px;
+  padding: 12px;
+}
+.skill-group-card.collapsed .skill-grid { display: none; }
+/* на печати и в PDF-версии листа свёрнутые группы разворачиваются —
+   печатный лист всегда содержит все умения */
+@media print {
+  .skill-group-card.collapsed .skill-grid { display: grid; }
+  .skill-group-card.collapsed .sg-preview { visibility: hidden; }
+  .role-ability-text.collapsed { display: block; }
+}
+.skill-chip {
+  display: flex; flex-direction: column; gap: 6px; justify-content: space-between;
+  min-height: 74px; padding: 8px 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+}
+.skill-chip.zero { opacity: .55; }
+.chip-name { font-size: 11.5px; line-height: 1.25; color: var(--text); }
+.chip-row { display: flex; align-items: center; gap: 6px; }
+.attr-tag {
+  font-size: 9.5px; font-weight: 800; letter-spacing: .05em; color: var(--cyan);
+  background: rgba(0,229,255,.1); border: 1px solid rgba(0,229,255,.3);
+  border-radius: 6px; padding: 2px 5px;
+}
+.lvl-input {
+  width: 40px; padding: 3px 4px; text-align: center;
+  background: var(--panel-2); color: #fff; font-weight: 800; font-size: 12.5px;
+  border: 1px solid var(--line); border-radius: 7px;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.lvl-input::-webkit-outer-spin-button, .lvl-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.lvl-input:focus { outline: none; border-color: var(--red); box-shadow: 0 0 8px rgba(255,0,60,.3); }
+.chip-sum {
+  margin-left: auto; min-width: 24px; text-align: center;
+  font-size: 12.5px; font-weight: 800; color: var(--yellow);
+  background: rgba(255,0,60,.12); border-radius: 7px; padding: 3px 6px;
+}
+
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
 /* Навыки занимают всю ширину панели: две колонки внутри skills-wrap,
    поэтому список навыков помещается целиком и ничего не обрезается. */

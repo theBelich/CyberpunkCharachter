@@ -19,6 +19,7 @@ import { exec } from "../src/roles/exec.js";
 import { media } from "../src/roles/media.js";
 import { lawman } from "../src/roles/lawman.js";
 import { SKILLS, SKILL_BY_NAME, SKILL_GROUPS } from "../data/skills.js";
+import { ROLE_ABILITIES } from "../data/role-abilities.js";
 import { buildSheetData, exportJSON, exportXLSX, exportPDF, downloadBlob, parseImportedJSON } from "./exporters.js";
 
 const ROLES = [solo, netrunner, rockerboy, nomad, fixer, tech, medtech, exec, media, lawman];
@@ -605,6 +606,42 @@ function applyStatChange(key, rawValue) {
 }
 
 // ------------------------------------------------------------
+// Ролевая способность (Role Ability) — блок над характеристиками,
+// сразу под именем и ролью. Текст берётся из data/role-abilities.js
+// (перевод описаний из книги игрока, Core Rulebook, стр. 144–163).
+// Клик по заголовку сворачивает/разворачивает описание; состояние
+// хранится в localStorage, чтобы блок оставался скрытым между листами.
+// ------------------------------------------------------------
+const RA_LS_KEY = "cp-red-role-ability-collapsed";
+
+function renderRoleAbility(c) {
+  const ab = ROLE_ABILITIES[c.role] || null;
+  const box = $("role-ability");
+  if (!box) return;
+  const nameEl = $("ra-name"), enEl = $("ra-en"),
+        pageEl = $("ra-page"), textEl = $("ra-text"),
+        toggle = $("role-ability-toggle");
+  if (!ab) {
+    nameEl.textContent = "—";
+    enEl.textContent = "";
+    pageEl.textContent = "—";
+    textEl.textContent = "Создайте персонажа — здесь появится описание ролевой способности из книги игрока.";
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  nameEl.textContent = `${ab.name} · ${c.roleRu}`;
+  enEl.textContent = `(${ab.nameEn})`;
+  pageEl.textContent = ab.page;
+  textEl.textContent = ab.text;
+  // состояние свёрнутости не теряется при перерисовке листа
+  const collapsed = localStorage.getItem(RA_LS_KEY) === "1";
+  textEl.classList.toggle("collapsed", collapsed);
+  box.classList.toggle("is-collapsed", collapsed);
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+}
+
+// ------------------------------------------------------------
 // Отрисовка листа
 // ------------------------------------------------------------
 function renderSheet(c) {
@@ -614,6 +651,10 @@ function renderSheet(c) {
   $("ch-age").textContent = c.age + " лет";
   $("ch-style").textContent = c.style;
   $("ch-method").textContent = c.methodName;
+
+  // Ролевая способность — описание из книги игрока (Core Rulebook, стр. 144–163).
+  // Блок находится над характеристиками, сразу под именем и ролью.
+  renderRoleAbility(c);
 
   // Характеристики — редактируемые числовые поля (1–10). Значение хранится в
   // data-value, чтобы при пустом поле кнопки «−» / «+» отталкивались от него.
@@ -676,24 +717,41 @@ function renderSheet(c) {
 }
 
 // ------------------------------------------------------------
-// Таблица навыков: название | характеристика | редактируемый уровень | сумма (уровень + характеристика)
+// Умения (навыки) персонажа — сетка карточек по группам навыков
+// (Core Rulebook, стр. 82–85). Общие группировки сохранены:
+// «Восприятие / Тело / Управление / Образование / Бой / Выступление /
+// Стрельба / Социальные / Техника». Каждая группа — скруглённый
+// прямоугольник-карточка; внутри — скруглённые квадратики умений
+// (название | хар-ка | уровень | бонус ур.+хар-ка). Заголовок группы
+// кликабельный — содержимое группы можно скрыть (состояние хранится
+// в localStorage и применяется к любой перерисовке таблицы).
 // ------------------------------------------------------------
 const SKILL_MIN = 0, SKILL_MAX = 10;
+const SG_LS_KEY = "cp-red-skill-groups-collapsed";
 
-function skillRowHtml(s, i, c) {
+// множество свёрнутых групп навыков + сохранение состояния
+let collapsedGroups = new Set();
+try { collapsedGroups = new Set(JSON.parse(localStorage.getItem(SG_LS_KEY) || "[]")); } catch { /* пусто */ }
+function saveCollapsedGroups() {
+  try { localStorage.setItem(SG_LS_KEY, JSON.stringify([...collapsedGroups])); } catch { /* приватный режим */ }
+}
+
+// Одна карточка умения: название, тег характеристики, редактируемый уровень, сумма
+function skillCardHtml(s, i, c) {
   const stat = skillStat(s.name);
   const statVal = c.stats[stat];
   const sum = (typeof statVal === "number" ? statVal : 0) + s.level;
   return `
-    <tr class="${s.level === 0 ? "zero" : ""}" data-skill="${i}">
-      <td>${skillRu(s.name)}</td>
-      <td class="attr-tag" title="${STAT_RU[stat] || stat}">${stat}</td>
-      <td class="lvl">
+    <div class="skill-chip${s.level === 0 ? " zero" : ""}" data-skill="${i}"
+         title="${skillRu(s.name)} · ${STAT_RU[stat] || stat}">
+      <span class="chip-name">${skillRu(s.name)}</span>
+      <span class="chip-row">
+        <span class="attr-tag" title="Характеристика проверки: ${STAT_RU[stat] || stat}">${stat}</span>
         <input type="number" class="lvl-input" min="${SKILL_MIN}" max="${SKILL_MAX}" step="1"
                value="${s.level}" aria-label="Уровень навыка: ${skillRu(s.name)}" />
-      </td>
-      <td class="mod">${sum}</td>
-    </tr>`;
+        <span class="chip-sum" title="Уровень + характеристика">${sum}</span>
+      </span>
+    </div>`;
 }
 
 function renderSkillsTable(c) {
@@ -704,24 +762,57 @@ function renderSkillsTable(c) {
   // не терялись и уровень правился у нужного навыка. Сортировка
   // «по убыванию уровня» — только визуальная (стабильная).
   const rows = c.skills.map((s, i) => ({ s, i })).sort((a, b) => b.s.level - a.s.level || a.i - b.i);
-  // Группируем отсортированные строки по категориям навыков (Core Rulebook, стр. 82–85)
+  // Группируем отсортированные строки по категориям навыков (общие группировки книги)
   const byGroup = new Map();
   for (const r of rows) {
     const g = SKILL_BY_NAME[r.s.name]?.group || "Прочее";
     if (!byGroup.has(g)) byGroup.set(g, []);
     byGroup.get(g).push(r);
   }
-  body.innerHTML = [...byGroup.entries()]
-    .map(([g, list]) =>
-      `<tr class="skill-group"><td colspan="4">${GROUP_RU[g] || g} <span class="cnt">(${list.length})</span></td></tr>` +
-      list.map(({ s, i }) => skillRowHtml(s, i, c)).join("")
-    )
+  // порядок групп — как в справочнике книги (GROUP_RU), неизвестные — в конце
+  const groupOrder = Object.keys(GROUP_RU);
+  const orderIdx = (g) => { const i = groupOrder.indexOf(g); return i === -1 ? 999 : i; };
+  const ordered = [...byGroup.entries()].sort((a, b) => orderIdx(a[0]) - orderIdx(b[0]));
+
+  body.innerHTML = ordered
+    .map(([g, list]) => {
+      const ru = GROUP_RU[g] || g;
+      const isCollapsed = collapsedGroups.has(g);
+      const top = list.filter(({ s }) => s.level > 0).slice(0, 3)
+        .map(({ s }) => `${skillRu(s.name)} (${s.level})`).join(", ");
+      return `
+      <section class="skill-group-card${isCollapsed ? " collapsed" : ""}" data-group="${g}">
+        <button type="button" class="skill-group-head" aria-expanded="${!isCollapsed}"
+                title="Скрыть / показать содержимое группы «${ru}»">
+          <span class="sg-title">${ru}</span>
+          <span class="cnt">(${list.length})</span>
+          <span class="sg-preview">${top}</span>
+          <span class="collapse-arrow" aria-hidden="true">▾</span>
+        </button>
+        <div class="skill-grid">
+          ${list.map(({ s, i }) => skillCardHtml(s, i, c)).join("")}
+        </div>
+      </section>`;
+    })
     .join("");
+
+  // заголовки групп: клик скрывает/показывает содержимое группы
+  body.querySelectorAll(".skill-group-head").forEach((head) => {
+    head.addEventListener("click", () => {
+      const card = head.closest(".skill-group-card");
+      const g = card.dataset.group;
+      const nowCollapsed = !card.classList.contains("collapsed");
+      card.classList.toggle("collapsed", nowCollapsed);
+      head.setAttribute("aria-expanded", String(!nowCollapsed));
+      if (nowCollapsed) collapsedGroups.add(g); else collapsedGroups.delete(g);
+      saveCollapsedGroups();
+    });
+  });
 
   // при изменении уровня — обновляем данные персонажа и пересобираем таблицу
   body.querySelectorAll("input.lvl-input").forEach((inp) => {
     inp.addEventListener("change", () => {
-      const idx = Number(inp.closest("tr").dataset.skill);
+      const idx = Number(inp.closest("[data-skill]").dataset.skill);
       let v = Math.round(Number(inp.value));
       if (!Number.isFinite(v)) v = SKILL_MIN;
       v = Math.max(SKILL_MIN, Math.min(SKILL_MAX, v));
@@ -729,6 +820,8 @@ function renderSkillsTable(c) {
       inp.value = v;
       renderSkillsTable(current);
     });
+    // клик по полю ввода не должен «просвечивать» в заголовок группы
+    inp.addEventListener("click", (e) => e.stopPropagation());
   });
 }
 
@@ -995,6 +1088,18 @@ function init() {
   // Жизненный путь: сгенерировать случайно / выбрать вручную
   $("btn-lp-roll")?.addEventListener("click", generateLifepath);
   $("btn-lp-pick")?.addEventListener("click", () => toggleLpEditor());
+
+  // Ролевая способность: клик по заголовку скрывает/показывает описание
+  // (состояние запоминается в localStorage — см. renderRoleAbility)
+  $("role-ability-toggle")?.addEventListener("click", () => {
+    const box = $("role-ability"), textEl = $("ra-text");
+    if (!box || !textEl || box.classList.contains("hidden")) return;
+    const collapsed = !textEl.classList.contains("collapsed");
+    textEl.classList.toggle("collapsed", collapsed);
+    box.classList.toggle("is-collapsed", collapsed);
+    $("role-ability-toggle").setAttribute("aria-expanded", String(!collapsed));
+    try { localStorage.setItem(RA_LS_KEY, collapsed ? "1" : "0"); } catch { /* приватный режим */ }
+  });
 }
 
 // Если DOM уже готов — запускаем сразу; иначе ждём DOMContentLoaded
