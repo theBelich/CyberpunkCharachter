@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cyberpunk RED — Лист персонажа и генератор</title>
+  <meta name="description" content="Киберпанк-лист персонажа: создание персонажа тремя способами по правилам Cyberpunk RED (Data/Cyberpunk Red Core Rulebook v1.25.pdf, стр. 73–79)." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <!-- ===== Шапка ===== -->
+  <header class="app-head">
+    <div class="brand">
+      <span class="brand-red">CYBERPUNK</span>
+      <span class="brand-outline">RED</span>
+      <small>Лист персонажа · Найт-Сити 2045 · данные: Data/Cyberpunk Red Core Rulebook v1.25.pdf</small>
+    </div>
+    <div class="head-actions">
+      <button class="btn ghost" id="btn-print" type="button">Печать</button>
+      <button class="btn" id="btn-save" type="button">Сохранить</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ===== Панель управления ===== -->
+    <aside class="controls">
+      <section class="mode-panel">
+        <h2>Роль персонажа</h2>
+        <label>
+          Выберите роль
+          <select id="role-select" aria-label="Выбор роли персонажа"></select>
+        </label>
+        <p class="arch-info" id="role-info">—</p>
+      </section>
+
+      <!-- Три способа создания — три кнопки -->
+      <section class="presets">
+        <h2 class="presets-title">Создать персонажа — 3 способа</h2>
+        <div class="preset-list">
+          <button class="preset-card" id="btn-method-1" type="button" data-method="1">
+            <span class="preset-head">
+              <span class="preset-icon">🎲</span>
+              <span>
+                <span class="preset-name">Способ №1 · Уличная крыса (Streetrats)</span><br />
+                <span class="preset-tagline">Быстрый старт по готовым шаблонам</span>
+              </span>
+            </span>
+            <p class="preset-desc">
+              Бросок 1d10 — характеристики берутся целиком из строки таблицы шаблона для выбранной роли.
+              Переставлять значения нельзя. Источник: Core Rulebook, стр. 73–77.
+            </p>
+          </button>
+
+          <button class="preset-card" id="btn-method-2" type="button" data-method="2">
+            <span class="preset-head">
+              <span class="preset-icon">⚡</span>
+              <span>
+                <span class="preset-name">Способ №2 · Эджраннер (Edgerunners)</span><br />
+                <span class="preset-tagline">«Быстро и грязно» — бросок на каждую характеристику</span>
+              </span>
+            </span>
+            <p class="preset-desc">
+              Отдельный бросок 1d10 для каждой из 10 характеристик; результат читается по столбцу таблицы
+              шаблонов роли. Источник: Core Rulebook, стр. 77.
+            </p>
+          </button>
+
+          <button class="preset-card" id="btn-method-3" type="button" data-method="3">
+            <span class="preset-head">
+              <span class="preset-icon">🧬</span>
+              <span>
+                <span class="preset-name">Способ №3 · Полный пакет (Complete Packages)</span><br />
+                <span class="preset-tagline">Расчёт очками — 62 пункта характеристик</span>
+              </span>
+            </span>
+            <p class="preset-desc">
+              Распределение пула очков (по умолчанию 62 — «Стартовый персонаж»), мин. 2 / макс. 8 на
+              характеристику. Источник: Core Rulebook, стр. 78.
+            </p>
+          </button>
+        </div>
+
+        <!-- Панель распределения очков для способа №3 -->
+        <div class="manual-box hidden" id="buy-box">
+          <summary class="manual-summary" id="buy-summary">Тонкая настройка очков</summary>
+          <label class="pick-hint" style="display:block;margin-top:8px;">
+            Ранг персонажа (пул очков):
+            <select id="rank-select" aria-label="Ранг персонажа">
+              <option value="50">Второстепенный персонаж — 50</option>
+              <option value="62" selected>Стартовый персонаж — 62</option>
+              <option value="70">Крупный второстепенный — 70</option>
+              <option value="75">Герой поменьше — 75</option>
+              <option value="80">Крупный герой — 80</option>
+            </select>
+          </label>
+          <div class="attr-grid" id="buy-grid"></div>
+          <p class="small" id="buy-left">Осталось очков: 0</p>
+          <div class="gen-row">
+            <button class="btn primary big" id="btn-buy-apply" type="button">Применить очки</button>
+            <button class="btn" id="btn-buy-auto" type="button">Автораспределить</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="saved">
+        <h3>Сохранённые персонажи</h3>
+        <div id="saved-list"><p class="muted small">Пока пусто — создайте персонажа и нажмите «Сохранить».</p></div>
+      </section>
+    </aside>
+
+    <!-- ===== Лист персонажа ===== -->
+    <section class="sheet-col">
+      <article class="sheet-card" id="sheet">
+        <div class="sheet-head">
+          <div>
+            <p class="kicker">Ночной город · 2045</p>
+            <h1 id="ch-name">Безымянный эджраннер</h1>
+            <div class="head-meta">
+              <span><i>Роль:</i> <b id="ch-role">—</b></span>
+              <span><i>Имя:</i> <span id="ch-realname">неизвестно</span></span>
+              <span><i>Возраст:</i> <span id="ch-age">—</span></span>
+              <span><i>Стиль:</i> <span id="ch-style">—</span></span>
+            </div>
+          </div>
+          <span class="method-badge" id="ch-method">Ещё не создан</span>
+        </div>
+
+        <div class="panel">
+          <h2>Характеристики (STAT Block)</h2>
+          <div class="stats-grid" id="stats-grid"></div>
+
+          <h2>Производные характеристики</h2>
+          <div class="derived-grid">
+            <div class="dstat"><span>Бодрость (HP)</span><b id="d-hp">—</b></div>
+            <div class="dstat"><span>Тяжело ранен (порог)</span><b id="d-sw">—</b></div>
+            <div class="dstat"><span>Спасбросок от смерти</span><b id="d-ds">—</b></div>
+            <div class="dstat"><span>Человечность (HUM)</span><b id="d-hum">—</b></div>
+            <div class="dstat"><span>Скорость (MOVE)</span><b id="d-move">—</b></div>
+          </div>
+        </div>
+
+        <div class="panel two-col">
+          <div>
+            <h2>Навыки роли</h2>
+            <div class="skills-wrap">
+              <table class="skills">
+                <thead><tr><th>Навык</th><th>Ур.</th></tr></thead>
+                <tbody id="skills-body"><tr><td colspan="2" class="muted">Сначала создайте персонажа.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h2>Жизненный путь</h2>
+            <div class="lifepath" id="lifepath">
+              <p class="muted small">Создайте персонажа, чтобы вытянуть жизненный путь.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Снаряжение и кредиты</h2>
+          <ul class="list" id="gear-list">
+            <li class="muted">Нет данных — персонаж ещё не создан.</li>
+          </ul>
+          <p class="small"><i>Наличные:</i> <b id="ch-cash">—</b></p>
+        </div>
+
+        <footer class="sheet-foot">
+          <span>Cyberpunk RED · генератор по трём способам создания (стр. 73–79 Core Rulebook)</span>
+          <span id="foot-note">Все данные — из папки Data/</span>
+        </footer>
+      </article>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
