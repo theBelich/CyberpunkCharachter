@@ -2476,6 +2476,7 @@ function renderSkillsTable(c) {
       head.setAttribute("aria-expanded", String(!nowCollapsed));
       if (nowCollapsed) collapsedGroups.add(g); else collapsedGroups.delete(g);
       saveCollapsedGroups();
+      layoutSkillGroups(); // высота карточки изменилась — перелистываем колонки
     });
   });
 
@@ -2499,86 +2500,141 @@ function renderSkillsTable(c) {
 }
 
 // ------------------------------------------------------------
-// Masonry-раскладка карточек групп умений: карточки «переливаются»
-// в самую короткую колонку, поэтому сетка плавно занимает всё
+// Masonry-раскладка карточек групп умений: карточки расставляются
+// в самом коротком месте колонки, поэтому сетка плавно занимает всё
 // пространство без пустот в конце ряда.
+// Колонки формирует CSS (column-count), а порядок обхода задаёт JS —
+// так карточки физически не могут наехать друг на друга: каждая
+// находится в обычном потоке своей колонки.
 // ------------------------------------------------------------
-const SG_MIN_COL_WIDTH = 300; // минимальная ширина колонки (как minmax в CSS)
+const SG_MIN_COL_WIDTH = 300; // минимальная ширина колонки
 let sgResizeObserver = null;
 
 function skillGroupCards(body) {
   return [...body.children].filter((el) => el.classList && el.classList.contains("skill-group-card"));
 }
 
-// Плавная пере-раскладка: измеряем скрытым дубликатом, затем применяем
-// новые позиции. При повторной раскладке карточки плавно «переезжают»
-// на новые места (transition по transform).
+// Раскладка: число колонок -> обход карточек «в самую короткую колонку»
+// (карточки переставляются в DOM), затем FLIP-анимация переездов.
+// Все измеренные величины — относительные (с поправкой на прокрутку),
+// поэтому скролл страницы не влияет на результат.
 let sgPendingFrame = 0;
-let sgPositionsApplied = false;
+let sgLaidOutOrder = "";
+let sgRafId = 0;
 
 function applySkillGroupsLayout() {
   const body = $("skills-body");
-  if (!body || body.classList.contains("no-js-layout")) return;
-  const cards = skillGroupCards(body);
+  if (!body) return;
+  let cards = skillGroupCards(body);
   if (!cards.length) return;
 
   const cs = getComputedStyle(body);
   const gap = parseFloat(cs.getPropertyValue("--sg-gap")) || 14;
-  const rowH = parseFloat(cs.getPropertyValue("--sg-row")) || 8;
   const width = body.clientWidth;
   if (!width) return;
 
   const cols = Math.max(1, Math.floor((width + gap) / (SG_MIN_COL_WIDTH + gap)));
   body.style.setProperty("--sg-cols", String(cols));
 
-  // измерение: карточка-эталон вне потока сетки
-  const measure = document.createElement("div");
-  measure.className = "skill-group-card sg-measure";
-  measure.style.width = (width - gap * (cols - 1)) / cols + "px";
-  body.appendChild(measure);
-
-  const spans = cards.map((card) => {
-    const clone = card.cloneNode(true);
-    clone.classList.remove("sg-measure");
-    measure.innerHTML = "";
-    measure.appendChild(clone);
-    const h = measure.getBoundingClientRect().height;
-    return Math.max(1, Math.ceil((h + gap) / (rowH + gap)));
-  });
-  measure.remove();
-
-  // FLIP-анимация: запоминаем прежние позиции карточек
-  const first = new Map();
-  if (sgPositionsApplied) {
-    for (const c of cards) first.set(c, c.getBoundingClientRect());
+  // Честные геометрии карточек ДО пере-раскладки: если на карточке ещё
+  // «играет» анимация предыдущего переезда, её getBoundingClientRect
+  // искажён transform'ом. Временно подменяем карточку display:contents-
+  // клоном (без inline-стилей и анимаций) — так получаем реальную позицию
+  // и размер элемента в потоке колонок.
+  function honestRect(el) {
+    const clone = el.cloneNode(true);
+    clone.removeAttribute("style");
+    clone.style.display = "contents";
+    el.parentNode.insertBefore(clone, el);
+    el.style.display = "none";
+    void body.offsetHeight; // синхронный flush стиля
+    const r = el.getBoundingClientRect();
+    el.style.display = "";
+    clone.remove();
+    return r;
   }
 
-  // жадная расстановка: каждая карточка — в самую короткую колонку
-  const heights = new Array(cols).fill(0);
-  cards.forEach((card, i) => {
-    let col = 0;
-    for (let c = 1; c < cols; c++) if (heights[c] < heights[col]) col = c;
-    card.style.gridColumn = String(col + 1);
-    card.style.gridRow = `${heights[col] + 1} span ${spans[i]}`;
-    heights[col] += spans[i];
-  });
-  sgPositionsApplied = true;
+  const firstInfo = new Map();
+  for (const c of cards) {
+    const r = honestRect(c);
+    firstInfo.set(c, { top: r.top, left: r.left, w: r.width, h: r.height });
+  }
 
-  // ...и компенсируем сдвиг, чтобы перестановка выглядела плавной
-  if (first.size) {
-    for (const c of cards) {
-      const prev = first.get(c);
-      if (!prev) continue;
-      const dx = prev.left - c.getBoundingClientRect().left;
-      const dy = prev.top - c.getBoundingClientRect().top;
-      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-      c.style.transition = "none";
-      c.style.transform = `translate(${dx}px, ${dy}px)`;
-      requestAnimationFrame(() => {
+  // одна колонка: порядок групп — как в книге, перестановка не нужна
+  if (cols === 1) {
+    const bookOrder = cards
+      .map((c, i) => [c, i])
+      .sort((a, b) => {
+        const ia = GROUP_ORDER.indexOf(a[0].dataset.group);
+        const ib = GROUP_ORDER.indexOf(b[0].dataset.group);
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib) || a[1] - b[1];
+      })
+      .map(([c]) => c);
+    const key = bookOrder.map((c) => c.dataset.group).join("|");
+    if (key !== sgLaidOutOrder) {
+      for (const card of bookOrder) body.appendChild(card);
+      sgLaidOutOrder = key;
+    }
+  } else {
+    // жадный masonry по честно измеренным высотам (ширина колонок при
+    // этом не меняется — она зависит только от --sg-cols и ширины контейнера):
+    // считаем, в какой колонке окажется каждая карточка,
+    // и группируем их по колонкам (высота колонки = сумма высот карточек
+    // плюс межкарточные отступы)
+    const colH = new Array(cols).fill(0);
+    const byCol = Array.from({ length: cols }, () => []);
+    cards.forEach((card, i) => {
+      let col = 0;
+      for (let c = 1; c < cols; c++) if (colH[c] < colH[col]) col = c;
+      byCol[col].push(card);
+      colH[col] += firstInfo.get(card).h + gap;
+    });
+
+    // новый порядок в DOM: сначала все карточки 1-й колонки, затем 2-й и т.д.
+    const ordered = byCol.flat();
+    const orderKey = ordered.map((c) => c.dataset.group).join("|");
+    if (orderKey !== sgLaidOutOrder) {
+      for (const card of ordered) body.appendChild(card);
+      sgLaidOutOrder = orderKey;
+    }
+    cards = skillGroupCards(body);
+    void body.offsetHeight; // flush после перестановки узлов в DOM
+  }
+
+  // FLIP «last + invert + play»: карточки плавно «переезжают» на новые места.
+  // Измерения выполняются синхронно (в одном кадре), поэтому прокрутка
+  // страницы сокращается; старые смещения всегда сбрасываются заранее —
+  // иначе «зависший» transform визуально сдвигает карточку и она наезжает
+  // на соседнюю.
+  for (const c of cards) {
+    c.style.transition = "none";
+    c.style.transform = "";
+  }
+  let moved = false;
+  for (const c of cards) {
+    const prev = firstInfo.get(c);
+    if (!prev) continue;
+    const r = c.getBoundingClientRect();
+    const dx = prev.left - r.left;
+    const dy = prev.top - r.top;
+    // если карточка ещё и изменила размер (сворачивание группы) —
+    // плавный переезд выглядел бы странно, пропускаем анимацию для неё
+    if (Math.abs(prev.w - r.width) > 1 || Math.abs(prev.h - r.height) > 1) continue;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+    moved = true;
+    c.style.transform = `translate(${dx}px, ${dy}px)`;
+  }
+  if (moved) {
+    // запускаем анимацию одним кадром (общий rAF — меньше перерисовок)
+    if (sgRafId) cancelAnimationFrame(sgRafId);
+    sgRafId = requestAnimationFrame(() => {
+      sgRafId = 0;
+      for (const c of cards) {
+        if (!c.style.transform) continue;
         c.style.transition = "transform .35s ease";
         c.style.transform = "";
-      });
-    }
+      }
+    });
   }
 }
 
@@ -2594,14 +2650,17 @@ function layoutSkillGroups() {
 function setupSkillGroupsMasonry() {
   const body = $("skills-body");
   if (!body) return;
-  // нативный masonry браузера — JS-раскладчик не нужен
-  if (window.CSS && CSS.supports && CSS.supports("grid-template-rows", "masonry")) return;
-  try {
-    body.style.setProperty("--sg-cols", "1"); // проверка применимости custom property
-    if (getComputedStyle(body).gridAutoRows === "auto") { body.classList.add("no-js-layout"); return; }
-  } catch { body.classList.add("no-js-layout"); return; }
 
-  sgResizeObserver = new ResizeObserver(() => layoutSkillGroups());
+  // наблюдатель за контейнером реагирует только на изменение ШИРИНЫ:
+  // высота меняется самой раскладкой (перестановка карточек), и реакция
+  // на неё создала бы бесконечный цикл перерисовок с «прыгающими» позициями
+  let sgLastW = -1;
+  sgResizeObserver = new ResizeObserver((entries) => {
+    const w = Math.round(entries[0].contentRect.width);
+    if (w === sgLastW) return;
+    sgLastW = w;
+    layoutSkillGroups();
+  });
   sgResizeObserver.observe(body);
   const mo = new MutationObserver((muts) => {
     for (const m of muts) {
