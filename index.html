@@ -18,6 +18,7 @@
       <small>Лист персонажа · Найт-Сити 2045 · данные: Data/Cyberpunk Red Core Rulebook v1.25.pdf</small>
     </div>
     <div class="head-actions">
+      <button class="btn ghost" id="btn-toggle-controls" type="button" aria-expanded="true" aria-controls="controls-panel" title="Скрыть / показать панель генерации персонажа (Ctrl+B)">◀ Панель</button>
       <button class="btn primary" id="btn-shop" type="button" title="Открыть магазин Найт-Сити: киберимпланты, оружие, расходники, бакалея, одежда">🛒 Открыть магазин</button>
       <button class="btn ghost" id="btn-print" type="button">Печать</button>
       <button class="btn" id="btn-save" type="button">Сохранить</button>
@@ -38,7 +39,7 @@
 
   <main class="layout">
     <!-- ===== Панель управления ===== -->
-    <aside class="controls">
+    <aside class="controls" id="controls-panel">
       <section class="mode-panel">
         <h2>Роль персонажа</h2>
         <label>
@@ -238,6 +239,23 @@
           </ul>
           <p class="small"><i>Наличные:</i> <b id="ch-cash">—</b></p>
 
+          <!-- Активные оружие и броня: только одно оружие и одна броня могут быть активны -->
+          <div class="loadout-box" id="loadout-box">
+            <h3 class="loadout-title">🎯 Экипировка</h3>
+            <div class="loadout-row">
+              <span class="loadout-label">⚔️ Активное оружие:</span>
+              <span class="loadout-value" id="active-weapon-name">не выбрано</span>
+              <span class="loadout-stat" id="active-weapon-dmg" title="Урон оружия (можно изменить, нажав на него)">—</span>
+              <button class="btn tiny ghost" id="btn-change-weapon" type="button" title="Выбрать активное оружие из инвентаря или добавить новое">Сменить</button>
+            </div>
+            <div class="loadout-row">
+              <span class="loadout-label">🛡️ Активная броня:</span>
+              <span class="loadout-value" id="active-armor-name">не выбрана</span>
+              <span class="loadout-stat" id="active-armor-sp" title="SP брони — защита; нажмите, чтобы изменить">—</span>
+              <button class="btn tiny ghost" id="btn-change-armor" type="button" title="Выбрать активную броню из инвентаря или добавить новую">Сменить</button>
+            </div>
+          </div>
+
           <!-- Импланты: отдельный список (киберимпланты, купленные в магазине) -->
           <div class="implants-box hidden" id="implants-box">
             <h3 class="implants-title">💾 Импланты <span class="implants-count small muted" id="implants-count"></span></h3>
@@ -292,6 +310,24 @@
           <span class="muted small" id="shop-src"></span>
         </div>
         <div class="shop-groups" id="shop-groups"><!-- категории и товары --></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ===== Модальное окно «Выбор активного оружия / брони» ===== -->
+  <div class="shop-modal hidden" id="loadout-modal" role="dialog" aria-modal="true" aria-labelledby="loadout-modal-title">
+    <div class="shop-backdrop" data-loadout-close></div>
+    <div class="shop-dialog loadout-dialog">
+      <header class="shop-head">
+        <h2 id="loadout-modal-title">🎯 Выбор экипировки</h2>
+        <button class="btn tiny ghost" id="loadout-close-top" type="button" data-loadout-close aria-label="Закрыть окно выбора экипировки">✕ Закрыть</button>
+      </header>
+      <section class="shop-catalog" aria-label="Каталог вооружения и брони">
+        <div class="shop-crumbs">
+          <span class="shop-crumb-name" id="loadout-crumb-name"></span>
+          <span class="muted small" id="loadout-hint"></span>
+        </div>
+        <div class="shop-groups" id="loadout-groups"><!-- категории и товары --></div>
       </section>
     </div>
   </div>
