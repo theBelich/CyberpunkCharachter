@@ -297,10 +297,44 @@ table.skills input.lvl-input:focus { outline: none; border-color: var(--red); }
 
 /* ---------- умения: сетка скруглённых карточек по группам ---------- */
 .skills-wrap { display: block; } /* группы умений занимают всю ширину панели */
-.skill-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+/* Masonry-сетка: карточки групп «переливаются» по колонкам и плавно
+   заполняют всю высоту контейнера без пустот в конце ряда.
+   Число колонок (--sg-cols) и позиции карточек задаёт JS-раскладчик
+   (setupSkillGroupsMasonry в js/app.js); здесь — базовые стили и fallback. */
+.skill-groups {
+  --sg-cols: 1;
+  --sg-gap: 14px;
+  --sg-row: 8px;           /* высота тонкой строки-«пикселя» */
+  display: grid;
+  grid-template-columns: repeat(var(--sg-cols), minmax(0, 1fr));
+  grid-auto-rows: var(--sg-row);
+  gap: var(--sg-gap);
+  align-items: start;
+}
+/* Нативный masonry (если браузер его поддерживает) — проще и плавнее */
+@supports (grid-template-rows: masonry) {
+  .skill-groups {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-rows: masonry;
+    grid-auto-rows: auto;
+  }
+  .skill-groups > .skill-group-card { grid-row: auto !important; grid-column: auto !important; }
+}
+/* Fallback: если JS-раскладчик не применился — обычная auto-fit сетка */
+.skill-groups.no-js-layout {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-auto-rows: auto;
+}
 .skill-group-card {
   border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--panel-2); overflow: hidden;
+  contain: layout style; /* изолируем пересчёты размеров карточек */
+}
+/* невидимая карточка-эталон: по ней раскладчик измеряет «естественную»
+   ширину и высоту групп при текущем числе колонок */
+.sg-measure {
+  position: absolute !important; top: 0; left: 0;
+  visibility: hidden; pointer-events: none; z-index: -1;
 }
 .skill-group-head {
   display: flex; align-items: center; gap: 8px; width: 100%;
@@ -324,10 +358,24 @@ table.skills input.lvl-input:focus { outline: none; border-color: var(--red); }
   padding: 12px;
 }
 .skill-group-card.collapsed .skill-grid { display: none; }
+/* плавное сворачивание/разворачивание содержимого группы */
+.skill-group-card .skill-grid {
+  display: grid;
+  transition: opacity .25s ease, max-height .35s ease, padding .35s ease;
+}
+.skill-group-card.collapsed .skill-grid {
+  grid-template-columns: 1fr; /* не участвует в раскладке при нулевой высоте */
+  max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; overflow: hidden;
+  pointer-events: none;
+}
+.skill-group-card:not(.collapsed) .skill-grid { max-height: 100000px; opacity: 1; }
 /* на печати и в PDF-версии листа свёрнутые группы разворачиваются —
    печатный лист всегда содержит все умения */
 @media print {
-  .skill-group-card.collapsed .skill-grid { display: grid; }
+  /* печать использует простую потоковую раскладку (без masonry-позиционирования) */
+  .skill-groups { display: block !important; }
+  .skill-groups > .skill-group-card { grid-row: auto !important; grid-column: auto !important; margin-bottom: 14px; break-inside: avoid; }
+  .skill-group-card.collapsed .skill-grid { display: grid !important; max-height: none !important; padding: 12px !important; opacity: 1 !important; overflow: visible !important; }
   .skill-group-card.collapsed .sg-preview { visibility: hidden; }
   .role-ability-text.collapsed { display: block; }
 }

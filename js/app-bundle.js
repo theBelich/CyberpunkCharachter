@@ -2493,6 +2493,134 @@ function renderSkillsTable(c) {
     // клик по полю ввода не должен «просвечивать» в заголовок группы
     inp.addEventListener("click", (e) => e.stopPropagation());
   });
+
+  // пересчитываем masonry-раскладку после перерисовки групп
+  layoutSkillGroups();
+}
+
+// ------------------------------------------------------------
+// Masonry-раскладка карточек групп умений: карточки «переливаются»
+// в самую короткую колонку, поэтому сетка плавно занимает всё
+// пространство без пустот в конце ряда.
+// ------------------------------------------------------------
+const SG_MIN_COL_WIDTH = 300; // минимальная ширина колонки (как minmax в CSS)
+let sgResizeObserver = null;
+
+function skillGroupCards(body) {
+  return [...body.children].filter((el) => el.classList && el.classList.contains("skill-group-card"));
+}
+
+// Плавная пере-раскладка: измеряем скрытым дубликатом, затем применяем
+// новые позиции. При повторной раскладке карточки плавно «переезжают»
+// на новые места (transition по transform).
+let sgPendingFrame = 0;
+let sgPositionsApplied = false;
+
+function applySkillGroupsLayout() {
+  const body = $("skills-body");
+  if (!body || body.classList.contains("no-js-layout")) return;
+  const cards = skillGroupCards(body);
+  if (!cards.length) return;
+
+  const cs = getComputedStyle(body);
+  const gap = parseFloat(cs.getPropertyValue("--sg-gap")) || 14;
+  const rowH = parseFloat(cs.getPropertyValue("--sg-row")) || 8;
+  const width = body.clientWidth;
+  if (!width) return;
+
+  const cols = Math.max(1, Math.floor((width + gap) / (SG_MIN_COL_WIDTH + gap)));
+  body.style.setProperty("--sg-cols", String(cols));
+
+  // измерение: карточка-эталон вне потока сетки
+  const measure = document.createElement("div");
+  measure.className = "skill-group-card sg-measure";
+  measure.style.width = (width - gap * (cols - 1)) / cols + "px";
+  body.appendChild(measure);
+
+  const spans = cards.map((card) => {
+    const clone = card.cloneNode(true);
+    clone.classList.remove("sg-measure");
+    measure.innerHTML = "";
+    measure.appendChild(clone);
+    const h = measure.getBoundingClientRect().height;
+    return Math.max(1, Math.ceil((h + gap) / (rowH + gap)));
+  });
+  measure.remove();
+
+  // FLIP-анимация: запоминаем прежние позиции карточек
+  const first = new Map();
+  if (sgPositionsApplied) {
+    for (const c of cards) first.set(c, c.getBoundingClientRect());
+  }
+
+  // жадная расстановка: каждая карточка — в самую короткую колонку
+  const heights = new Array(cols).fill(0);
+  cards.forEach((card, i) => {
+    let col = 0;
+    for (let c = 1; c < cols; c++) if (heights[c] < heights[col]) col = c;
+    card.style.gridColumn = String(col + 1);
+    card.style.gridRow = `${heights[col] + 1} span ${spans[i]}`;
+    heights[col] += spans[i];
+  });
+  sgPositionsApplied = true;
+
+  // ...и компенсируем сдвиг, чтобы перестановка выглядела плавной
+  if (first.size) {
+    for (const c of cards) {
+      const prev = first.get(c);
+      if (!prev) continue;
+      const dx = prev.left - c.getBoundingClientRect().left;
+      const dy = prev.top - c.getBoundingClientRect().top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      c.style.transition = "none";
+      c.style.transform = `translate(${dx}px, ${dy}px)`;
+      requestAnimationFrame(() => {
+        c.style.transition = "transform .35s ease";
+        c.style.transform = "";
+      });
+    }
+  }
+}
+
+function layoutSkillGroups() {
+  if (sgPendingFrame) cancelAnimationFrame(sgPendingFrame);
+  sgPendingFrame = requestAnimationFrame(() => {
+    sgPendingFrame = 0;
+    applySkillGroupsLayout();
+  });
+}
+
+// Инициализация один раз: наблюдатель за размерами контейнера и его карточек
+function setupSkillGroupsMasonry() {
+  const body = $("skills-body");
+  if (!body) return;
+  // нативный masonry браузера — JS-раскладчик не нужен
+  if (window.CSS && CSS.supports && CSS.supports("grid-template-rows", "masonry")) return;
+  try {
+    body.style.setProperty("--sg-cols", "1"); // проверка применимости custom property
+    if (getComputedStyle(body).gridAutoRows === "auto") { body.classList.add("no-js-layout"); return; }
+  } catch { body.classList.add("no-js-layout"); return; }
+
+  sgResizeObserver = new ResizeObserver(() => layoutSkillGroups());
+  sgResizeObserver.observe(body);
+  const mo = new MutationObserver((muts) => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (n.nodeType === 1 && n.classList && n.classList.contains("skill-group-card")) {
+          sgResizeObserver.observe(n);
+        }
+      }
+    }
+    layoutSkillGroups();
+  });
+  mo.observe(body, { childList: true });
+  skillGroupCards(body).forEach((c) => sgResizeObserver.observe(c));
+  layoutSkillGroups();
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", setupSkillGroupsMasonry);
+} else {
+  setupSkillGroupsMasonry();
 }
 
 // ------------------------------------------------------------
