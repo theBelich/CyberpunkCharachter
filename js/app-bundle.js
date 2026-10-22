@@ -464,6 +464,817 @@ const ROLE_ABILITIES = {
 };
 
 /* ------------------------------------------------------------
+   [2a] МАГАЗИНЫ — src/shops/*.js (Core Rulebook, Night Market Appendix)
+   ------------------------------------------------------------ */
+// 1) КИБЕРМАСТЕРСКАЯ (Cyberware) — Core Rulebook, стр. 358–367
+//    hl — потеря Человечности (Humanity Loss).
+//    install: Mall — молл/уличная био-мастерская, Clinic — клиника риппердока,
+//             Hospital — госпиталь, Chipware — сокет чипвары.
+
+// ДАННЫЕ МАГАЗИНОВ — Cyberpunk RED
+// Источник: Data/Cyberpunk Red Core Rulebook v1.25.pdf,
+//   «Night Market Appendix» (стр. 340–376) и раздел
+//   «The New Street Economy» (стр. 336–377).
+// Формат записей:
+//   name / ru  — английское название по книге и перевод для отображения
+//   cost       — цена в эдди (eb)
+//   tier       — градация стоимости по книге (Cheap / Everyday / Costly / …)
+//   page       — страница печатного издания (Core Rulebook)
+//   note       — краткое описание механики из таблиц книги
+//   damage / mag / rof / hands / conceal / skill — оружие (стр. 340–341)
+//   sp / penalty                                 — броня (стр. 350)
+//   hl / install                                 — киберимпланты (стр. 358–367)
+//   size                                         — одежда: Bottoms/Top/Jacket/Footwear/…
+//   kind                                         — расходники: ammo / battery / chip / drug
+//   unit                                         — единица продажи патронов (10 шт. или 1 шт.)
+// ============================================================
+
+
+const CYBERWARE = {
+    id: "cyberware",
+    ru: "Киберимпланты",
+    en: "Cyberware",
+    icon: "🦾",
+    src: "Core Rulebook, стр. 358–367 (Night Market Appendix · Cyberware)",
+    hint: "Устанавливается у риппердока; каждая имплант снимает очки Человечности (HL).",
+    groups: [
+      {
+        title: "Фешенвар (Fashionware)",
+        items: [
+          { name: "Biomonitor", ru: "Биомонитор", cost: 100, tier: "Premium", install: "Mall", hl: 0, page: "358",
+            note: "Подкожный имплант: постоянный светодиодный дисплей пульса, температуры, дыхания, уровня сахара; можно связать с Агентом." },
+          { name: "Chemskin", ru: "Хемскин (умная кожа)", cost: 100, tier: "Premium", install: "Mall", hl: 0, page: "358",
+            note: "Красители и пигменты, навсегда меняющие оттенок кожи; реакция на температуру и гормоны. С Techhair даёт +2 к Личному уходу." },
+          { name: "EMP Threading", ru: "ЭМП-нити", cost: 10, tier: "Cheap", install: "Mall", hl: 0, page: "358",
+            note: "Тонкие серебряные линии-«схемы» по всему телу.Заявленной защиты от ЭМИ нет — но выглядит круто." },
+          { name: "Light Tattoo", ru: "Светотатуировка", cost: 100, tier: "Premium", install: "Mall", hl: 0, page: "358",
+            note: "Подкожные светящиеся пластины — цветные тату под кожей. Три и более установки дают +2 к Стилю и одежде." },
+          { name: "Shift Tacts", ru: "Сменные линзы (Shift Tacts)", cost: 100, tier: "Premium", install: "Mall", hl: 0, page: "358",
+            note: "Имплантируемые линзы с меняющимся цветом и узором (реакция на температуру/гормоны)." },
+          { name: "Skinwatch", ru: "Скинвотч", cost: 100, tier: "Premium", install: "Mall", hl: 0, page: "359",
+            note: "Подкожный имплант: время и дата светятся через кожу." },
+          { name: "Techhair", ru: "Техволосы", cost: 100, tier: "Premium", install: "Mall", hl: 0, page: "359",
+            note: "Искусственные волосы с подсветкой цвета; удлинение/втягивание, реакция на температуру и гормоны." }
+        ]
+      },
+      {
+        title: "Нейровар (Neuralware) · база: Neural Link",
+        items: [
+          { name: "Neural Link", ru: "Нейролинк", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "359",
+            note: "Проводная искусственная нервная система — основа Нейровара. 5 слотов опций; нужен для Subdermal Grip." },
+          { name: "Braindance Recorder", ru: "Рекордер брейнденса", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "359",
+            note: "Опция нейровара: запись брейденса на Memory Chip или связанный Агент. Требует Neural Link." },
+          { name: "Chipware Socket", ru: "Сокет чипвары", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "359",
+            note: "Разъём на затылке для быстрой установки одного чипа чипвары (установка — действие). Требует Neural Link." },
+          { name: "Interface Plugs", ru: "Интерфейсные разъёмы", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "359",
+            note: "Разъёмы на запястьях/голове: подключение к смартганам, кибердекам, тяжёлой технике, управление транспортом без рук. Требует Neural Link." },
+          { name: "Kerenzikov", ru: "Керензиков", cost: 500, tier: "Expensive", install: "Clinic", hl: 14, page: "359",
+            note: "Постоянный спидвар: +2 к броскам Инициативы. Одновременно можно иметь только один спидвар. Требует Neural Link." },
+          { name: "Sandevistan", ru: "Сандевистан", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "359",
+            note: "Спидвар короткого действия: +3 к Инициативе в течение минуты (действие), затем перезарядка час. Требует Neural Link." },
+          { name: "Chemical Analyzer (chipware)", ru: "Химанализатор (чипвара)", cost: 500, tier: "Expensive", install: "Chipware", hl: 3, page: "359",
+            note: "Чипвара: точный химический состав веществ действием. Требует Chipware Socket." },
+          { name: "Memory Chip (chipware)", ru: "Чип памяти (чипвара)", cost: 10, tier: "Cheap", install: "Chipware", hl: 0, page: "359",
+            note: "Стандарт хранения данных; установка в Chipware Socket." },
+          { name: "Olfactory Boost (chipware)", ru: "Усиление обоняния (чипвара)", cost: 100, tier: "Premium", install: "Chipware", hl: 7, page: "359",
+            note: "Позволяет использовать Слежение по запаху. Требует Chipware Socket." },
+          { name: "Pain Editor (chipware)", ru: "Редактор боли (чипвара)", cost: 1000, tier: "Very Expensive", install: "Chipware", hl: 14, page: "360",
+            note: "Отключает болевые рецепторы: игнорирует состояние «Тяжело ранен». Требует Chipware Socket." },
+          { name: "Skill Chip (chipware)", ru: "Чип навыка (чипвара)", cost: 500, tier: "Expensive", install: "Chipware", hl: 7, page: "360",
+            note: "Даёт навык на уровне +3 (если он не выучен выше). Чипы для навыков (x2) — 1000eb. Требует Chipware Socket." },
+          { name: "Tactile Boost (chipware)", ru: "Усиление осязания (чипвара)", cost: 100, tier: "Premium", install: "Chipware", hl: 7, page: "360",
+            note: "Рука на поверхности чувствует движение в радиусе 20 м. Требует Chipware Socket." }
+        ]
+      },
+      {
+        title: "Кибероптика (Cyberoptics) · база: Cybereye",
+        items: [
+          { name: "Cybereye", ru: "Киберглаз", cost: 100, tier: "Premium", install: "Clinic", hl: 7, page: "360",
+            note: "Искусственный глаз вместо мясного. 3 слота опций Киберглаза; часть опций ставится парой в оба глаза." },
+          { name: "Anti-Dazzle", ru: "Защита от ослепления", cost: 100, tier: "Premium", install: "Mall", hl: 2, page: "360",
+            note: "Иммунитет к вспышкам (в т.ч. светошумовым). Требует два Киберглаза, ставится парой." },
+          { name: "Chyron", ru: "Хирон (подэкран)", cost: 100, tier: "Premium", install: "Mall", hl: 2, page: "360",
+            note: "Мини-экран в поле зрения: сообщения и видео с другой электроники. Требует Cybereye." },
+          { name: "Color Shift", ru: "Смена цвета глаза", cost: 100, tier: "Premium", install: "Mall", hl: 2, page: "360",
+            note: "Косметика: неограниченная смена цвета и узора радужки действием. Требует Cybereye." },
+          { name: "Dartgun (eye)", ru: "Дартиган в глазу", cost: 500, tier: "Expensive", install: "Clinic", hl: 2, page: "360",
+            note: "Спрятанный в Киберглазе экзотический Дартиган, 1 выстрел. Требует Cybereye, занимает 3 слота." },
+          { name: "Image Enhance", ru: "Улучшение изображения", cost: 500, tier: "Expensive", install: "Mall", hl: 3, page: "360",
+            note: "+2 к Внимательности, Чтению по губам и Поиску предметов при проверках со зрением. Пара, два Киберглаза." },
+          { name: "Low Light / Infrared / UV", ru: "Ночной режим (ИК / УФ)", cost: 500, tier: "Expensive", install: "Mall", hl: 3, page: "360",
+            note: "Штрафы темноты, дыма и тумана = 0; различает тёплое мясо и холодный металл. Пара, по 2 слота на глаз." },
+          { name: "MicroOptics", ru: "Микрооптика", cost: 100, tier: "Premium", install: "Clinic", hl: 2, page: "361",
+            note: "Микроскоп в глазу: увеличение до 400×. Требует Cybereye." },
+          { name: "MicroVideo", ru: "Микрокамера", cost: 500, tier: "Expensive", install: "Clinic", hl: 2, page: "361",
+            note: "Камера в глазу пишет видео и звук на чип памяти или в Агент. Требует Cybereye, 2 слота." },
+          { name: "Radiation Detector", ru: "Детектор радиации", cost: 1000, tier: "Very Expensive", install: "Clinic", hl: 3, page: "361",
+            note: "Показывает уровень радиации в радиусе 100 м синим свечением над источником. Требует Cybereye." },
+          { name: "Targeting Scope", ru: "Прицельная сетка", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "361",
+            note: "+1 к проверке при прицельном выстреле. Не суммируется. Требует Cybereye." },
+          { name: "TeleOptics", ru: "Телеоптика", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "361",
+            note: "Видит детали до 800 м; +1 к атаке одиночным выстрелом на дистанции 51+ м. Не складывается с оптикой Снайпинг. Требует Cybereye." },
+          { name: "Virtuality", ru: "Виртуалити", cost: 100, tier: "Premium", install: "Mall", hl: 2, page: "361",
+            note: "Проекция образов киберпространства поверх реального вида. Пара, два Киберглаза." }
+        ]
+      },
+      {
+        title: "Кибернаудика (Cyberaudio) · база: Cyberaudio Suite",
+        items: [
+          { name: "Cyberaudio Suite", ru: "Комплект кибернауки", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "361",
+            note: "Невидимый комплект во внутреннем черепе; 3 слота опций. Не более одного комплекта." },
+          { name: "Amplified Hearing", ru: "Усиленный слух", cost: 100, tier: "Premium", install: "Mall", hl: 3, page: "361",
+            note: "+2 к Внимательности на слуховых проверках. Требует Cyberaudio Suite." },
+          { name: "Audio Recorder", ru: "Аудиорекордер", cost: 100, tier: "Premium", install: "Clinic", hl: 2, page: "361",
+            note: "Пишет звук на чип памяти или в Агент. Требует Cyberaudio Suite." },
+          { name: "Bug Detector", ru: "Детектор жучков", cost: 100, tier: "Premium", install: "Mall", hl: 2, page: "361",
+            note: "Сигналит в 2 м от прослушки. Требует Cyberaudio Suite." },
+          { name: "Homing Tracer", ru: "Трекер-маяк", cost: 100, tier: "Premium", install: "Clinic", hl: 2, page: "361",
+            note: "Ведёт связанный маяк до 1 мили; маяк в комплекте, замена 50eb. Требует Cyberaudio Suite." },
+          { name: "Internal Agent", ru: "Внутренний Агент", cost: 100, tier: "Premium", install: "Mall", hl: 3, page: "362",
+            note: "Полноценный Агент, управляемый голосом; чип памяти извлечь без операции нельзя. Требует Cyberaudio Suite." },
+          { name: "Level Damper", ru: "Шумодампер", cost: 100, tier: "Premium", install: "Mall", hl: 2, page: "362",
+            note: "Иммунитет к оглушению громким звуком (флешбанги и пр.). Требует Cyberaudio Suite." },
+          { name: "Radio Communicator", ru: "Радиосвязь", cost: 100, tier: "Premium", install: "Mall", hl: 2, page: "362",
+            note: "Связь по радио на 1 милю. Требует Cyberaudio Suite." },
+          { name: "Radio Scanner / Music Player", ru: "Радиосканер / плеер", cost: 50, tier: "Costly", install: "Clinic", hl: 2, page: "362",
+            note: "Сканирует все радиодиапазоны в миле, играет музыку из Data Pool или с чипа. Требует Cyberaudio Suite." },
+          { name: "Radar Detector", ru: "Радар-детектор", cost: 500, tier: "Expensive", install: "Clinic", hl: 2, page: "362",
+            note: "Сигналит при активном радаре в 100 м. Требует Cyberaudio Suite." },
+          { name: "Scrambler / Descrambler", ru: "Скремблер / дескремблер", cost: 100, tier: "Premium", install: "Mall", hl: 2, page: "362",
+            note: "Шифрование переговоров; дескремблер в комплекте. Требует Cyberaudio Suite." },
+          { name: "Voice Stress Analyzer", ru: "Анализатор стресса голоса", cost: 100, tier: "Premium", install: "Mall", hl: 3, page: "362",
+            note: "+2 к Человеческой проницательности и Допросу; минутный режим детектора лжи действием. Требует Cyberaudio Suite." }
+        ]
+      },
+      {
+        title: "Внутренний кибервар (Internal Body Cyberware)",
+        items: [
+          { name: "AudioVox", ru: "АудиВокс", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "362",
+            note: "Вокальный синтезатор: +2 к Актёрской игре и к Игре на инструменте во время пения." },
+          { name: "Contraceptive Implant", ru: "Контрацептивный имплант", cost: 10, tier: "Cheap", install: "Mall", hl: 0, page: "362",
+            note: "Имплант против нежелательной беременности." },
+          { name: "Enhanced Antibodies", ru: "Усиленные антитела", cost: 500, tier: "Expensive", install: "Mall", hl: 2, page: "362",
+            note: "После стабилизации: отдых восстанавливает 2×BODY очков HP в день до полного здоровья." },
+          { name: "Cybersnake", ru: "Киберзмея", cost: 1000, tier: "Very Expensive", install: "Hospital", hl: 14, page: "363",
+            note: "Щупальце-оружие в горле/пищеводе: очень тяжёлое ближнее оружие (4d6, ROF 1), скрывается без проверки." },
+          { name: "Gills", ru: "Жабры", cost: 1000, tier: "Very Expensive", install: "Hospital", hl: 7, page: "363",
+            note: "Позволяют дышать под водой." },
+          { name: "Grafted Muscle and Bone Lace", ru: "Нарощенные мышцы и костный плетень", cost: 1000, tier: "Very Expensive", install: "Hospital", hl: 14, page: "363",
+            note: "+2 к BODY (влияет на HP, порог ранения и спасбросок смерти); установки складываются, BODY выше 10 не поднимает." },
+          { name: "Independent Air Supply", ru: "Автономный запас воздуха", cost: 1000, tier: "Very Expensive", install: "Hospital", hl: 2, page: "363",
+            note: "30 минут воздуха; перезаправка час или замена баллона за 50eb (действие)." },
+          { name: "Midnight Lady™ Sexual Implant", ru: "Midnight Lady™ (секс-имплант)", cost: 100, tier: "Premium", install: "Clinic", hl: 7, page: "364",
+            note: "«Будь Венерой, будь огнём. Будь желанием.»" },
+          { name: "Mr. Studd™ Sexual Implant", ru: "Mr. Studd™ (секс-имплант)", cost: 100, tier: "Premium", install: "Clinic", hl: 7, page: "364",
+            note: "«Всю ночь, каждую ночь. И они никогда не узнают.»" },
+          { name: "Nasal Filters", ru: "Носовые фильтры", cost: 100, tier: "Premium", install: "Clinic", hl: 2, page: "364",
+            note: "Иммунитет к ядовитым газам и парам; отключаются без действия." },
+          { name: "Radar / Sonar Implant", ru: "Радар / сонар", cost: 1000, tier: "Very Expensive", install: "Clinic", hl: 7, page: "364",
+            note: "Сканирует местность в 50 м (в т.ч. под водой) на новые угрозы; ГМ подаёт сигнал о движущемся объекте." },
+          { name: "Toxin Binders", ru: "Связыватели токсинов", cost: 100, tier: "Premium", install: "Clinic", hl: 2, page: "364",
+            note: "+2 к Стойкости (пытки/наркотики). Не суммируется." },
+          { name: "Vampyres", ru: "Вампирсы (клыки)", cost: 500, tier: "Expensive", install: "Clinic", hl: 14, page: "364",
+            note: "Клыки: отличное лёгкое ближнее оружие (1d6, ROF 2), прячется без проверки; отсек для флакона яда/биотоксина с нанесением без проверки." }
+        ]
+      },
+      {
+        title: "Внешний кибервар (External Body Cyberware)",
+        items: [
+          { name: "Hidden Holster", ru: "Скрытая кобура", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "364",
+            note: "Кобура в теле: оружие, способное прятаться, скрывается без проверки и достаётся без действия." },
+          { name: "Skin Weave", ru: "Кожаное плетение (SP7)", cost: 500, tier: "Expensive", install: "Hospital", hl: 7, page: "364",
+            note: "Тело и голова в броне SP7; наномашинки восстанавливают 1 SP за день естественного лечения." },
+          { name: "Subdermal Armor", ru: "Подкожная броня (SP11)", cost: 1000, tier: "Very Expensive", install: "Hospital", hl: 14, page: "364",
+            note: "Тело и голова в броне SP11; наномашинки ремонтируют по 1 SP за день отдыха." },
+          { name: "Subdermal Pocket", ru: "Подкожный карман", cost: 100, tier: "Premium", install: "Clinic", hl: 3, page: "364",
+            note: "Полость 5×10 см с застёжкой Realskinn™; содержимое прячется без проверки." }
+        ]
+      },
+      {
+        title: "Киберконечности (Cyberlimbs) · база: Cyberarm / Cyberleg",
+        items: [
+          { name: "Cyberarm", ru: "Киберрука", cost: 500, tier: "Expensive", install: "Hospital", hl: 7, page: "364",
+            note: "Замена руки; 4 слота опций, стандартная кисть в комплекте (без HL и слота)." },
+          { name: "Standard Hand", ru: "Стандартная кисть", cost: 100, tier: "Premium", install: "Clinic", hl: 2, page: "364",
+            note: "Выглядит как обычная кисть; слот Киберруки не занимает." },
+          { name: "Big Knucks", ru: "Биг Накс (биты на костяшках)", cost: 100, tier: "Premium", install: "Clinic", hl: 3, page: "364",
+            note: "Бронированные костяшки: среднее ближнее оружие (2d6, ROF 2), прячется без проверки; рука занята оружием." },
+          { name: "Cyberdeck (in Cyberarm)", ru: "Кибердека в руке", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "364",
+            note: "Дека в Киберруке: +1 постоянный слот дека; демонтаж убивает деку. Требует дека от владельца, Cyberarm, 3 слота; нужны Interface Plugs и Neural Link." },
+          { name: "Grapple Hand", ru: "Кисть с гарпуном", cost: 100, tier: "Premium", install: "Clinic", hl: 3, page: "365",
+            note: "Ракетный захват до 30 м по прочному укрытию; трос держит 2× массы тела, 10 HP; штраф лазанья снимается. Требует Cyberarm." },
+          { name: "Medscanner (Cyberarm)", ru: "Медсканер в руке", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "365",
+            note: "+2 к Первой помощи и Парамедику. Требует Cyberarm, 2 слота; не суммируется." },
+          { name: "Popup Grenade Launcher", ru: "Выдвижной гранатомёт", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "365",
+            note: "Однозарядный ручный гранатомёт в Киберруке; прячется и выезжает без действий. Требует Cyberarm, 2 слота." },
+          { name: "Popup Melee Weapon", ru: "Выдвижное ближнее оружие", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "365",
+            note: "Лёгкое/среднее/тяжёлое одноручное оружие в Киберруке: прячется без проверки, достаётся без действия. Требует Cyberarm, 2 слота." },
+          { name: "Popup Shield", ru: "Выдвижной щит", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "365",
+            note: "Пуленепробиваемый щит внутри Киберруки; достаётся/убирается без действия. Требует Cyberarm, 3 слота." },
+          { name: "Popup Ranged Weapon", ru: "Выдвижное дальнее оружие", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "365",
+            note: "Одноручное дальнобойное оружие владельца в Киберруке; прячется без проверки. Требует Cyberarm, 2 слота." },
+          { name: "Quick Change Mount", ru: "Быстросъёмное крепление", cost: 100, tier: "Premium", install: "Clinic", hl: 7, page: "365",
+            note: "Киберрука ставится и снимается действием; повторная установка своей руки HL не даёт. Требует Cyberarm." },
+          { name: "Rippers", ru: "Рипперы (когти)", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "365",
+            note: "Выдвишные carboglass ногти: среднее ближнее оружие (2d6, ROF 2). Можно единственная импланта мясной руки." },
+          { name: "Scratchers", ru: "Скрэтчеры (ногти)", cost: 100, tier: "Premium", install: "Mall", hl: 2, page: "366",
+            note: "Carboglass ногти: лёгкое ближнее оружие (1d6, ROF 2), прячутся без проверки." },
+          { name: "Shoulder Cam", ru: "Плечевая камера", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "366",
+            note: "Выдвижная камера в плече пишет независимо от владельца. Требует Cyberarm, 2 слота." },
+          { name: "Slice 'N Dice", ru: "Слайс энд Дайс (монофиламент)", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "366",
+            note: "Моноволоконный кнут в большом пальце: среднее ближнее оружие (2d6, ROF 2)." },
+          { name: "Subdermal Grip", ru: "Подкожный хват", cost: 100, tier: "Premium", install: "Clinic", hl: 3, page: "366",
+            note: "Пластина под ладонью для смартганов; альтернатива Interface Plugs. Требует Neural Link, занимает слот нейровара." },
+          { name: "Techscanner (Cyberarm)", ru: "Тексканер в руке", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "366",
+            note: "+2 к Базовой технике, Кибертехнике, техникам транспорта, Электронике/безопасности и Оружейнику. Требует Cyberarm, 2 слота." },
+          { name: "Tool Hand", ru: "Рука-инструмент", cost: 100, tier: "Premium", install: "Clinic", hl: 3, page: "366",
+            note: "В пальцах отвёртки, ключи, дрель — Техинструмент всегда с вами." },
+          { name: "Wolvers", ru: "Волверс (лезвия в костяшках)", cost: 500, tier: "Expensive", install: "Clinic", hl: 7, page: "366",
+            note: "Выдвишные carboglass когти: тяжёлое ближнее оружие (3d6, ROF 2), прячутся без проверки." },
+          { name: "Cyberleg", ru: "Кибернога", cost: 100, tier: "Premium", install: "Hospital", hl: 3, page: "366",
+            note: "Замена ноги; 3 слота опций, стандартная стопа в комплекте (без HL и слота)." },
+          { name: "Standard Foot", ru: "Стандартная стопа", cost: 100, tier: "Premium", install: "Clinic", hl: 2, page: "366",
+            note: "Выглядит как обычная стопа; слот Киберноги не занимает." },
+          { name: "Grip Foot", ru: "Сцепная стопа", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "367",
+            note: "Тракционная подошва: снимает штраф движения при лазании. Две Киберноги, ставится парой." },
+          { name: "Jump Booster", ru: "Прыжковые бустеры", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "367",
+            note: "Гидравлика в ногах: снимает штраф прыжка. Две Киберноги, 2 слота, пара." },
+          { name: "Skate Foot", ru: "Стопа-ролики", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "367",
+            note: "Встроенные роликовые коньки: +6 м к скорости при беге. Две Киберноги, пара." },
+          { name: "Talon Foot", ru: "Стопа с когтем", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "367",
+            note: "Лезвие в стопе: лёгкое ближнее оружие; прячется без проверки." },
+          { name: "Web Foot", ru: "Лыжная стопа (перепонки)", cost: 500, tier: "Expensive", install: "Clinic", hl: 3, page: "367",
+            note: "Перепонки между пальцами: снимает штраф плавания. Две Киберноги, пара." },
+          { name: "Hardened Shielding", ru: "Защищённая схема конечности", cost: 1000, tier: "Very Expensive", install: "Clinic", hl: 3, page: "367",
+            note: "Киберконечность и её опции не отключаются ЭМИ и эффектами программ. Требует Cyberarm или Cyberleg." },
+          { name: "Plastic Covering", ru: "Пластиковое покрытие", cost: 100, tier: "Premium", install: "Mall", hl: 0, page: "367",
+            note: "Полимерное покрытие конечности в любых цветах и узорах; слот не занимает." },
+          { name: "Realskinn™ Covering", ru: "Покрытие Realskinn™", cost: 500, tier: "Expensive", install: "Mall", hl: 0, page: "367",
+            note: "Искусственная кожа на киберконечность; слот не занимает." },
+          { name: "Superchrome® Covering", ru: "Покрытие Superchrome®", cost: 1000, tier: "Very Expensive", install: "Mall", hl: 0, page: "367",
+            note: "Зеркальный металлический корпус: +2 к Стилю и одежде (один раз); слот не занимает." }
+        ]
+      },
+      {
+        title: "БОРГвар (Borgware)",
+        items: [
+          { name: "Artificial Shoulder Mount", ru: "Искусственное плечевое крепление", cost: 1000, tier: "Very Expensive", install: "Hospital", hl: 14, page: "367",
+            note: "Позволяет смонтировать ещё 2 Киберруки под первой парой. Не более одного крепления." },
+          { name: "Implanted Linear Frame ∑ (Sigma)", ru: "Вживаемый линейный каркас Σ (Sigma)", cost: 1000, tier: "Very Expensive", install: "Hospital", hl: 14, page: "367",
+            note: "Усиленный скелет: BODY становится 12 (меняет HP и спасбросок смерти), выше 13 не растёт. Требует BODY 6 и Grafted Muscle and Bone Lace." },
+          { name: "Implanted Linear Frame ß (Beta)", ru: "Вживаемый линейный каркас ß (Beta)", cost: 5000, tier: "Luxury", install: "Hospital", hl: 14, page: "367",
+            note: "Мощнейший скелет: BODY становится 14 (меняет HP и спасбросок), выше 15 не растёт. Требует BODY 8 и двух Grafted Muscle and Bone Lace." },
+          { name: "MultiOptic Mount", ru: "Крепление мультиоптики", cost: 1000, tier: "Very Expensive", install: "Hospital", hl: 14, page: "367",
+            note: "До 5 дополнительных Киберглаза. Киберглаза покупаются отдельно. Не более одного крепления." },
+          { name: "Sensor Array", ru: "Сенсорная решётка («уши кролика»)", cost: 1000, tier: "Very Expensive", install: "Clinic", hl: 14, page: "367",
+            note: "Две антенны: до 5 дополнительных опций кибернауки без слотов. Требует Cyberaudio Suite; не более одной решётки." }
+        ]
+      }
+    ]
+  };
+
+
+// 2) ОРУЖЕЙНЫЙ МАГАЗИН (Weapons & Armor) — Core Rulebook, стр. 340–350
+//    melee: damage / hands / rof / conceal
+//    ranged: damage / mag (магазин) / rof / hands / conceal / skill
+
+// ДАННЫЕ МАГАЗИНОВ — Cyberpunk RED
+// Источник: Data/Cyberpunk Red Core Rulebook v1.25.pdf,
+//   «Night Market Appendix» (стр. 340–376) и раздел
+//   «The New Street Economy» (стр. 336–377).
+// Формат записей:
+//   name / ru  — английское название по книге и перевод для отображения
+//   cost       — цена в эдди (eb)
+//   tier       — градация стоимости по книге (Cheap / Everyday / Costly / …)
+//   page       — страница печатного издания (Core Rulebook)
+//   note       — краткое описание механики из таблиц книги
+//   damage / mag / rof / hands / conceal / skill — оружие (стр. 340–341)
+//   sp / penalty                                 — броня (стр. 350)
+//   hl / install                                 — киберимпланты (стр. 358–367)
+//   size                                         — одежда: Bottoms/Top/Jacket/Footwear/…
+//   kind                                         — расходники: ammo / battery / chip / drug
+//   unit                                         — единица продажи патронов (10 шт. или 1 шт.)
+// ============================================================
+
+
+const WEAPONS = {
+    id: "weapons",
+    ru: "Оружие",
+    en: "Weapons & Armor",
+    icon: "🔫",
+    src: "Core Rulebook, стр. 340–350 (Melee / Ranged / Attachments / Exotic / Armor)",
+    hint: "У каждого неэкзотического дальнобойного оружия 3 слота под аксессуары; качество меняет цену (см. «Качество оружия», стр. 342).",
+    groups: [
+      {
+        title: "Ближний бой (Melee Weapons)",
+        items: [
+          { name: "Light Melee Weapon", ru: "Лёгкое ближнее оружие (нож, томагавк)", cost: 50, tier: "Costly", page: "340",
+            damage: "1d6", hands: "различно", rof: 2, conceal: true,
+            note: "Боевой нож, томагавк. Скрытое ношение — возможно." },
+          { name: "Medium Melee Weapon", ru: "Среднее ближнее оружие (бита, мачете)", cost: 50, tier: "Costly", page: "340",
+            damage: "2d6", hands: "различно", rof: 2, conceal: false,
+            note: "Бейсбольная бита, лом, мачете." },
+          { name: "Heavy Melee Weapon", ru: "Тяжёлое ближнее оружие (меч, труба)", cost: 100, tier: "Premium", page: "340",
+            damage: "3d6", hands: "различно", rof: 2, conceal: false,
+            note: "Свинцовая труба, меч, бита с шипами." },
+          { name: "Very Heavy Melee Weapon", ru: "Очень тяжёлое ближнее оружие", cost: 500, tier: "Expensive", page: "340",
+            damage: "4d6", hands: "различно", rof: 1, conceal: false,
+            note: "Бензопила, кувалда, лопасти вертолёта, нагината." }
+        ]
+      },
+      {
+        title: "Дальний бой (Ranged Weapons)",
+        items: [
+          { name: "Medium Pistol", ru: "Средний пистолет", cost: 50, tier: "Costly", page: "341",
+            damage: "2d6", mag: "12 (M Pistol)", rof: 2, hands: 1, conceal: true, skill: "Handgun",
+            note: "Примеры: Dai Lung Streetmaster (плохое), Federated Arms X-9mm (стандарт), Militech «Avenger» (отличное)." },
+          { name: "Heavy Pistol", ru: "Тяжёлый пистолет", cost: 100, tier: "Premium", page: "341",
+            damage: "3d6", mag: "8 (H Pistol)", rof: 2, hands: 1, conceal: true, skill: "Handgun",
+            note: "Mustang Arms «Mark III», Nova «Cityhunter»." },
+          { name: "Very Heavy Pistol", ru: "Очень тяжёлый пистолет", cost: 100, tier: "Premium", page: "341",
+            damage: "4d6", mag: "8 (VH Pistol)", rof: 1, hands: 1, conceal: false, skill: "Handgun",
+            note: "Federated Arms «Super Chief», Sternmeyer P-35, Militech «Boomer Buster»." },
+          { name: "SMG", ru: "Пистолет-пулемёт", cost: 100, tier: "Premium", page: "341",
+            damage: "2d6", mag: "30 (M Pistol)", rof: 1, hands: 1, conceal: true, skill: "Handgun",
+            note: "Одиночный огонь; автоогонь (3) и заградительный огонь — особые режимы." },
+          { name: "Heavy SMG", ru: "Тяжёлый ПП", cost: 100, tier: "Premium", page: "341",
+            damage: "3d6", mag: "40 (H Pistol)", rof: 1, hands: 1, conceal: false, skill: "Handgun",
+            note: "Sternmeyer SMG-21, Militech «Viper»; автоогонь (3), заградительный огонь." },
+          { name: "Shotgun", ru: "Дробовик", cost: 500, tier: "Expensive", page: "341",
+            damage: "5d6", mag: "4 (Slug)", rof: 1, hands: 2, conceal: false, skill: "Shoulder Arms",
+            note: "GunMart «Home Defender», Arasaka «Rapid Assault», Militech «Bulldog»; патроны — shotgun shell." },
+          { name: "Assault Rifle", ru: "Штурмовая винтовка", cost: 500, tier: "Expensive", page: "341",
+            damage: "5d6", mag: "25 (Rifle)", rof: 1, hands: 2, conceal: false, skill: "Shoulder Arms",
+            note: "Militech «Ronin» / «Dragon»; автоогонь (4), заградительный огонь." },
+          { name: "Sniper Rifle", ru: "Снайперская винтовка", cost: 500, tier: "Expensive", page: "341",
+            damage: "5d6", mag: "4 (Rifle)", rof: 1, hands: 2, conceal: false, skill: "Shoulder Arms",
+            note: "GunMart «Snipe-Star», Nomad «Long Rifle», Arasaka WSSA." },
+          { name: "Bows & Crossbows", ru: "Луки и арбалеты", cost: 100, tier: "Premium", page: "341",
+            damage: "4d6", mag: "— (стрелы)", rof: 1, hands: 2, conceal: false, skill: "Archery",
+            note: "GunMart «Sherwood»/«Hunter», Eagletech «Tomcat», «Bearcat», «Striker», «Scorpion»; боеприпас — стрелы." },
+          { name: "Grenade Launcher", ru: "Гранатомёт", cost: 500, tier: "Expensive", page: "341",
+            damage: "6d6", mag: "2 (Grenade)", rof: 1, hands: 2, conceal: false, skill: "Heavy Weapons",
+            note: "Towa Type-G, Militech «Mini-Grenade», Tsunami Arms Type-18; взрывной урон." },
+          { name: "Rocket Launcher", ru: "Ракетница", cost: 500, tier: "Expensive", page: "341",
+            damage: "8d6", mag: "1 (Rocket)", rof: 1, hands: 2, conceal: false, skill: "Heavy Weapons",
+            note: "Towa Type-R, Militech «Urban» / «Hotshot»; взрывной урон." }
+        ]
+      },
+      {
+        title: "Аксессуары для оружия (Weapon Attachments · 3 слота)",
+        items: [
+          { name: "Bayonet", ru: "Штык", cost: 100, tier: "Premium", page: "343",
+            note: "Плечевое оружие становится лёгким ближним; скрыть под одеждой нельзя." },
+          { name: "Drum Magazine", ru: "Барабанный магазин", cost: 500, tier: "Expensive", page: "343",
+            note: "Магазин по строке «Drum» таблицы Clip Chart; один магазин на оружие; не прячется." },
+          { name: "Extended Magazine", ru: "Расширенный магазин", cost: 100, tier: "Premium", page: "343",
+            note: "Магазин по строке «Extended»; один за раз; не прячется." },
+          { name: "Grenade Launcher Underbarrel", ru: "Подствольный гранатомёт", cost: 500, tier: "Expensive", page: "343",
+            note: "2 слота; оружие работает как гранатомёт с 1 гранатой; не прячется." },
+          { name: "Infrared Nightvision Scope", ru: "Инфракрасный ночной прицел", cost: 500, tier: "Expensive", page: "343",
+            note: "Штрафы темноты/дыма/тумана = 0; различает живое и металл." },
+          { name: "Shotgun Underbarrel", ru: "Подствольный дробовик", cost: 500, tier: "Expensive", page: "343",
+            note: "2 слота; работает как дробовик с 2 патронами; не прячется." },
+          { name: "Smartgun Link", ru: "Смартган-линк", cost: 500, tier: "Expensive", page: "344",
+            note: "2 слота; +1 к стрельбе из смартгана; требует Neural Link и Interface Plugs или Subdermal Grip." },
+          { name: "Sniping Scope", ru: "Снайперский прицел", cost: 100, tier: "Premium", page: "343",
+            note: "Детали до 800 м; +1 к одиночному/прицельному выстрелу на 51+ м; не складывается с TeleOptics." }
+        ]
+      },
+      {
+        title: "Экзотическое оружие (Exotic Weapons)",
+        items: [
+          { name: "Air Pistol", ru: "Пневматический пистолет", cost: 100, tier: "Premium", page: "347",
+            note: "Экзотический средний пистолет: красочные шары (0 урона; кислота снимает 1 SP), критические ранения невозможны." },
+          { name: "Battleglove", ru: "Боевая перчатка", cost: 1000, tier: "Very Expensive", page: "347",
+            note: "3 слота опций Киберруки; надевание/снятие — действие; опции руки под перчаткой недоступны; не прячется." },
+          { name: "Constitution Arms Hurricane", ru: "Constitution Arms «Hurricane»", cost: 5000, tier: "Luxury", page: "348",
+            note: "Экзотический дробовик ROF 2, барабан 16; прицельные выстрелы невозможны; перезарядка 2 действия; требует BODY 11 (или турель)." },
+          { name: "Dartgun", ru: "Дартиган", cost: 100, tier: "Premium", page: "348",
+            note: "Экзотический очень тяжёлый пистолет: только нестандартные стрелы, магазин 8." },
+          { name: "Flamethrower", ru: "Огнемёт", cost: 500, tier: "Expensive", page: "348",
+            note: "Экзотический дробовик (Heavy Weapons); только зажигательные патроны; цель горит: 4 HP в конце хода; без критических ранений и прицельных." },
+          { name: "Kendachi Mono-Three", ru: "Kendachi Mono-Three", cost: 5000, tier: "Luxury", page: "348",
+            note: "Отличное двуручное очень тяжёлое ближнее оружие; с биометрическим ключом пробивает броню ниже SP11." },
+          { name: "Malorian Arms 3516", ru: "Malorian Arms 3516", cost: 10000, tier: "Super Luxury", page: "348",
+            note: "Отличный экзотический очень тяжёлый пистолет: 5d6, встроенный Smartgun Link; редчайший трофей." },
+          { name: "Microwaver", ru: "Микровейвер", cost: 500, tier: "Expensive", page: "348",
+            note: "Экзотический очень тяжёлый пистолет: DV15 Cybertech иначе 2 импланта/электронных устройства отключаются на минуту; батареи бесплатны (8 выстрелов, запасная 50eb)." },
+          { name: "Militech \"Cowboy\" U-56", ru: "Militech «Cowboy» U-56", cost: 5000, tier: "Luxury", page: "349",
+            note: "Экзотический гранатомёт ROF 2, магазин 4, любые гранаты; перезарядка 2 действия; BODY 11." },
+          { name: "Rhinemetall EMG-86 Railgun", ru: "Rhinemetall EMG-86 (рельсотрон)", cost: 5000, tier: "Luxury", page: "349",
+            note: "Экзотическая штурмовая винтовка (Heavy Weapons), 4 заряда; пробивает броню ниже SP11; без автоогня и прицельных; BODY 11." },
+          { name: "Shrieker", ru: "Шрикер", cost: 500, tier: "Expensive", page: "349",
+            note: "Экзотический очень тяжёлый пистолет: DV15 Resist Torture/Drugs иначе повреждённое ухо; без звука — сам получает травму уха; батареи 8 выстрелов." },
+          { name: "Stun Baton", ru: "Шок-дубинка", cost: 100, tier: "Premium", page: "349",
+            note: "Одноручное среднее ближнее оружие: ниже 1 HP цель впадает в бессознательное состояние; без критических ранений, броня не аблатится." },
+          { name: "Stun Gun", ru: "Шокер", cost: 100, tier: "Premium", page: "349",
+            note: "Экзотический тяжёлый пистолет: тот же нелетальный эффект; батарея на 8 выстрелов (запасная 50eb)." },
+          { name: "Tsunami Arms Helix", ru: "Tsunami Arms Helix", cost: 5000, tier: "Luxury", page: "349",
+            note: "Экзотическая винтовка только автоогня (40 патронов, расход 20 за очередь); урон 2d6 × превышение DV (до 5); BODY 11." }
+        ]
+      },
+      {
+        title: "Броня (Master Armor List)",
+        items: [
+          { name: "Leathers", ru: "Кожаная броня", cost: 20, tier: "Everyday", page: "350", sp: 4, penalty: "нет",
+            note: "Тонкая кожа с усилением на плечах, бёдрах и животе — выбор кочевников и байкеров." },
+          { name: "Kevlar®", ru: "Кевлар®", cost: 50, tier: "Costly", page: "350", sp: 7, penalty: "нет",
+            note: "Любая форма: одежда, жилеты, костюмы и даже бикини." },
+          { name: "Light Armorjack", ru: "Лёгкий armorjack", cost: 100, tier: "Premium", page: "350", sp: 11, penalty: "нет",
+            note: "Кевлар + пластиковые сетки в ткани; отлично против высокоскоростных пуль." },
+          { name: "Bodyweight Suit", ru: "Костюм Bodyweight", cost: 1000, tier: "Very Expensive", page: "350", sp: 11, penalty: "нет",
+            note: "Облегающий костюм с armorgel: носится и на тело, и на голову (две локации SP11); есть место под кибердеку и поддержка Interface Plugs; +1 слот Hardware связанной деке." },
+          { name: "Medium Armorjack", ru: "Средний armorjack", cost: 100, tier: "Premium", page: "350", sp: 12, penalty: "−2 REF, DEX, MOVE",
+            note: "Пластиковые пластины и усиленный кевлар — типичная уличная защита." },
+          { name: "Heavy Armorjack", ru: "Тяжёлый armorjack", cost: 500, tier: "Expensive", page: "350", sp: 13, penalty: "−2 REF, DEX, MOVE",
+            note: "Самый плотный armorjack: пластик + слои кевлара и сеток." },
+          { name: "Flak", ru: "Flak («дробь»)", cost: 500, tier: "Expensive", page: "350", sp: 15, penalty: "−4 REF, DEX, MOVE",
+            note: "Жилет и штаны с металлическими пластинами против взрывчатки и автоматных калибров." },
+          { name: "Metalgear®", ru: "Metalgear®", cost: 5000, tier: "Luxury", page: "350", sp: 18, penalty: "−4 REF, DEX, MOVE",
+            note: "Металлопластиковые плиты на сетчатом комбинезоне: держит почти всё, но вас легче попасть." },
+          { name: "Bulletproof Shield", ru: "Пуленепробиваемый щит", cost: 100, tier: "Premium", page: "350", sp: 10, penalty: "занята одна рука",
+            note: "Прозрачный поликарбонатный щит (10 HP, см. правила укрытий, стр. 183)." }
+        ]
+      }
+    ]
+  };
+
+
+// 3) РАСХОДНИКИ (боеприпасы, батареи, чипы, наркотики)
+//    Core Rulebook, стр. 344–347, 348–349, 351–355, 357–358
+
+// ДАННЫЕ МАГАЗИНОВ — Cyberpunk RED
+// Источник: Data/Cyberpunk Red Core Rulebook v1.25.pdf,
+//   «Night Market Appendix» (стр. 340–376) и раздел
+//   «The New Street Economy» (стр. 336–377).
+// Формат записей:
+//   name / ru  — английское название по книге и перевод для отображения
+//   cost       — цена в эдди (eb)
+//   tier       — градация стоимости по книге (Cheap / Everyday / Costly / …)
+//   page       — страница печатного издания (Core Rulebook)
+//   note       — краткое описание механики из таблиц книги
+//   damage / mag / rof / hands / conceal / skill — оружие (стр. 340–341)
+//   sp / penalty                                 — броня (стр. 350)
+//   hl / install                                 — киберимпланты (стр. 358–367)
+//   size                                         — одежда: Bottoms/Top/Jacket/Footwear/…
+//   kind                                         — расходники: ammo / battery / chip / drug
+//   unit                                         — единица продажи патронов (10 шт. или 1 шт.)
+// ============================================================
+
+
+const CONSUMABLES = {
+  id: "consumables",
+  ru: "Расходники",
+  en: "Ammunition & Consumables",
+  icon: "📦",
+  src: "Core Rulebook, стр. 344–347 (Clip Chart · Ammunition), 348–349 (батареи), 351–355 (Master Gear List)",
+  hint: "Патроны (кроме гранат и ракет) продаются пачками по 10 штук; у каждого оружия свой тип боеприпаса.",
+  groups: [
+    {
+      title: "Боеприпасы (Ammunition)",
+      items: [
+        { name: "Basic Ammunition", ru: "Обычные патроны", cost: 10, tier: "Cheap", unit: "за 10 шт.", kind: "ammo", page: "345",
+          note: "Стандартные патроны для оружия; типы: Medium/Heavy/Very Heavy Pistol, Rifle, Slug, Shotgun Shell, Arrow, Grenade, Rocket. Гранаты и ракеты — поштучно." },
+        { name: "Armor-Piercing Ammunition", ru: "Бронебойные патроны", cost: 100, tier: "Premium", unit: "за 10 шт.", kind: "ammo", page: "345",
+          note: "Все типы, кроме shotgun shell. Снимают с брони 2 SP вместо 1. Для гранат и ракет это базовый уровень." },
+        { name: "Biotoxin Ammunition", ru: "Патроны с биотоксином", cost: 500, tier: "Expensive", unit: "за 10 шт.", kind: "ammo", page: "345",
+          note: "Только стрелы и гранаты: урон 0, цель проходит DV15 Стойкость (пытки/наркотики) иначе 3d6 прямо по HP без абляции брони." },
+        { name: "EMP Ammunition", ru: "ЭМИ-патроны", cost: 500, tier: "Expensive", unit: "за 10 шт.", kind: "ammo", page: "345",
+          note: "Только гранаты: DV15 Кибертехника иначе 2 импланта или носимой электроники отключаются на минуту." },
+        { name: "Expansive Ammunition", ru: "Экспансивные патроны", cost: 100, tier: "Premium", unit: "за 10 шт.", kind: "ammo", page: "345",
+          note: "Стрелы, пули и slug: при критическом ранении «Инородное тело» цель кидает таблицу критических ранений ещё раз." },
+        { name: "Flashbang Ammunition", ru: "Светошумовые патроны", cost: 100, tier: "Premium", unit: "за 10 шт.", kind: "ammo", page: "346",
+          note: "Только гранаты: DV15 Стойкость иначе повреждённые глаз и ухо на минуту (без бонусного урона)." },
+        { name: "Incendiary Ammunition", ru: "Зажигательные патроны", cost: 100, tier: "Premium", unit: "за 10 шт.", kind: "ammo", page: "346",
+          note: "Стрелы, пули, гранаты и shotgun shell: урон прошёл сквозь броню — цель горит, 2 HP в конце хода, пока не потушит себя действием." },
+        { name: "Poison Ammunition", ru: "Отравленные патроны", cost: 100, tier: "Premium", unit: "за 10 шт.", kind: "ammo", page: "346",
+          note: "Только стрелы и гранаты: DV13 Стойкость иначе 2d6 прямо по HP без абляции брони." },
+        { name: "Rubber Ammunition", ru: "Резиновые патроны", cost: 10, tier: "Cheap", unit: "за 10 шт.", kind: "ammo", page: "346",
+          note: "Стрелы, пули и slug: не вызывают критических ранений, не снимают SP, цель не опускается ниже 1 HP." },
+        { name: "Sleep Ammunition", ru: "Снотворные патроны", cost: 500, tier: "Expensive", unit: "за 10 шт.", kind: "ammo", page: "346",
+          note: "Только стрелы и гранаты: DV13 Стойкость иначе цель лежит без сознания минуту (или пока не разбудят)." },
+        { name: "Smart Ammunition", ru: "Умные патроны", cost: 500, tier: "Expensive", unit: "за 10 шт.", kind: "ammo", page: "346",
+          note: "Стрелы, пули и ракеты; нужна импланта «Прицельная сетка» (Targeting Scope). Промах на 4 и меньше получает второй шанс попасть (+10 к d10)." },
+        { name: "Smoke Ammunition", ru: "Дымовые патроны", cost: 50, tier: "Costly", unit: "за 10 шт.", kind: "ammo", page: "347",
+          note: "Только гранаты: дым 10×10 м на минуту, обычный штраф −4." },
+        { name: "Teargas Ammunition", ru: "Слезоточивые патроны", cost: 50, tier: "Costly", unit: "за 10 шт.", kind: "ammo", page: "347",
+          note: "Только гранаты: DV13 Стойкость иначе повреждённый глаз на минуту (без бонусного урона)." }
+      ]
+    },
+    {
+      title: "Магазины и клипы (Clip Chart, стр. 344)",
+      items: [
+        { name: "Medium Pistol Clip", ru: "Medium Pistol: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "12 / 18 / 36 патронов." },
+        { name: "Heavy Pistol Clip", ru: "Heavy Pistol: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "8 / 14 / 28 патронов." },
+        { name: "Very Heavy Pistol Clip", ru: "Very Heavy Pistol: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "8 / 14 / 28 патронов." },
+        { name: "SMG Clip", ru: "SMG: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "30 / 40 / 50 патронов." },
+        { name: "Heavy SMG Clip", ru: "Heavy SMG: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "40 / 50 / 60 патронов." },
+        { name: "Shotgun Clip", ru: "Shotgun: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "4 / 8 / 16 патронов." },
+        { name: "Assault Rifle Clip", ru: "Assault Rifle: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "25 / 35 / 45 патронов." },
+        { name: "Sniper Rifle Clip", ru: "Sniper Rifle: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "4 / 8 / 12 патронов." },
+        { name: "Grenade Launcher Clip", ru: "Grenade Launcher: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "2 / 4 / 6 гранат." },
+        { name: "Rocket Launcher Clip", ru: "Rocket Launcher: Standard / Extended / Drum", cost: 0, tier: "—", kind: "chart", page: "344",
+          note: "1 / 2 / 3 ракеты." }
+      ]
+    },
+    {
+      title: "Батареи, чипы и прочее (стр. 348–349, 351–355)",
+      items: [
+        { name: "Battery Pack (rechargeable)", ru: "Аккумуляторный блок (8 выстрелов)", cost: 50, tier: "Costly", kind: "battery", page: "348",
+          note: "Для Микровейвера, Шрикера и Шокера: 1 час зарядки, запасной блок 50eb." },
+        { name: "Memory Chip", ru: "Чип памяти", cost: 10, tier: "Cheap", kind: "chip", page: "351",
+          note: "Тонкие пластины легированного пластика для данных любого вида; ёмкость зависит от модели." },
+        { name: "Linked Tracer (replacement)", ru: "Сменный маяк-трейсер", cost: 50, tier: "Costly", kind: "gear", page: "354",
+          note: "Запасной маяк для Homing Tracer (размером с пуговицу)." },
+        { name: "Cryopump Refill (per charge)", ru: "Заправка криопомпы (1 заряд)", cost: 50, tier: "Costly", kind: "gear", page: "353",
+          note: "Один заряд криожидкости = один человек в стазисе до недели." },
+        { name: "Independent Air Supply Tank", ru: "Баллон автономного воздуха", cost: 50, tier: "Costly", kind: "gear", page: "363",
+          note: "Сменный полный баллон для импланта Independent Air Supply (замена — действие)." },
+        { name: "Vial of Poison", ru: "Флакон яда", cost: 100, tier: "Premium", kind: "chemical", page: "351",
+          note: "Наносится на лёгкое ближнее оружие действием: 30 минут DV13 Стойкость иначе 2d6 прямо по HP." },
+        { name: "Vial of Biotoxin", ru: "Флакон биотоксина", cost: 500, tier: "Expensive", kind: "chemical", page: "351",
+          note: "Наносится на лёгкое ближнее оружие действием: 30 минут DV15 Стойкость иначе 3d6 прямо по HP." }
+      ]
+    },
+    {
+      title: "Уличные наркотики (Street Drugs, стр. 357–358)",
+      items: [
+        { name: "Black Lace", ru: "Black Lace («чёрное золото») · доза", cost: 50, tier: "Costly", kind: "drug", page: "357",
+          note: "24 часа: игнорирует состояние «Тяжело ранен»; −2 ЧЕЛОВЕЧНОСТИ (вернутся, если нет вторичного эффекта). Вторичный эффект DV17: привыкание, −2 REF вне действия." },
+        { name: "Blue Glass", ru: "Blue Glass · доза", cost: 20, tier: "Everyday", kind: "drug", page: "357",
+          note: "4 часа: ГМ периодически ловит вас «на флэшах» — пропуск действия за ход. DV15: привыкание; у зависимого первичный эффект даёт иммунитет к «флэшам»." },
+        { name: "Boost", ru: "Boost · доза", cost: 50, tier: "Costly", kind: "drug", page: "357",
+          note: "24 часа: +2 к INT (может превышать 8). DV17: привыкание, −2 INT вне действия." },
+        { name: "Smash", ru: "Smash · доза", cost: 10, tier: "Cheap", kind: "drug", page: "357",
+          note: "4 часа: жёлтая пена из банки, +2 к Танцам, Гимнастике, Разговору, Человеческой проницательности, Убеждению и Актёрской игре. DV15: привыкание и −2 тех же навыков." },
+        { name: "Synthcoke", ru: "Synthcoke · доза", cost: 20, tier: "Everyday", kind: "drug", page: "358",
+          note: "4 часа: +1 REF (может превышать 8) плюс параноидальные идеи. DV15: привыкание, −2 REF вне действия." }
+      ]
+    }
+  ]
+};
+
+
+// 4) БАКАЛЕЯ (Food & Drink) — Core Rulebook, стр. 331–332, 338–339, 351, 376
+
+// ДАННЫЕ МАГАЗИНОВ — Cyberpunk RED
+// Источник: Data/Cyberpunk Red Core Rulebook v1.25.pdf,
+//   «Night Market Appendix» (стр. 340–376) и раздел
+//   «The New Street Economy» (стр. 336–377).
+// Формат записей:
+//   name / ru  — английское название по книге и перевод для отображения
+//   cost       — цена в эдди (eb)
+//   tier       — градация стоимости по книге (Cheap / Everyday / Costly / …)
+//   page       — страница печатного издания (Core Rulebook)
+//   note       — краткое описание механики из таблиц книги
+//   damage / mag / rof / hands / conceal / skill — оружие (стр. 340–341)
+//   sp / penalty                                 — броня (стр. 350)
+//   hl / install                                 — киберимпланты (стр. 358–367)
+//   size                                         — одежда: Bottoms/Top/Jacket/Footwear/…
+//   kind                                         — расходники: ammo / battery / chip / drug
+//   unit                                         — единица продажи патронов (10 шт. или 1 шт.)
+// ============================================================
+
+
+const GROCERY = {
+  id: "grocery",
+  ru: "Бакалея",
+  en: "Food & Grocery",
+  icon: "🍜",
+  src: "Core Rulebook, стр. 331–332 (Vendits / Bodegas), 338–339 (Night Market · Food and Drugs), 351 (Master Gear List), 376 (Services)",
+  hint: "Всё днём напролёт: вендиты (стр. 331) и круглосуточные бадеги (стр. 332). Цены — по книжным таблицам.",
+  groups: [
+    {
+      title: "Из вендита / бадеги (упакованное)",
+      items: [
+        { name: "Ramen Noodles", ru: "Лапша рамен (вендит)", cost: 10, tier: "Cheap", page: "331",
+          note: "Типичная еда из вендита (строка «1d10 Food», цена 10–100eb)." },
+        { name: "Pizza", ru: "Пицца (вендит)", cost: 20, tier: "Everyday", page: "331",
+          note: "Горячая пицца из автомата — одна из самых частых позиций вендита." },
+        { name: "Hamburgers", ru: "Гамбургер (вендит)", cost: 20, tier: "Everyday", page: "331",
+          note: "Синтетическая котлета в булке; в бадеге бывает «как настоящее мясо»." },
+        { name: "Smash (can)", ru: "Smash в банке", cost: 10, tier: "Cheap", page: "331",
+          note: "Жёлтая шипучая пена в жестяной банке — продаётся везде (см. также «Расходники»)." },
+        { name: "Sushi", ru: "Суши (вендит)", cost: 50, tier: "Costly", page: "331",
+          note: "Вакуумная упаковка риса и рыбы; свежая порция дороже." },
+        { name: "Hot Meat", ru: "«Горячее мясо» (вендит)", cost: 50, tier: "Costly", page: "331",
+          note: "Разогретая мясная порция неизвестного происхождения — уличный деликатес." },
+        { name: "1 kg Bag of Kibble", ru: "Киббл, пакет 1 кг", cost: 10, tier: "Cheap", page: "331",
+          note: "Пакет сухих вафель/гранул на одну порцию; отличается от собачьего корма только вкусом «чизбургер»." },
+        { name: "Canned Coffee", ru: "Кофе в банке", cost: 10, tier: "Cheap", page: "331",
+          note: "Банка холодного кофе с кофеиновой дозой." },
+        { name: "Canned Juice", ru: "Сок в банке", cost: 10, tier: "Cheap", page: "331",
+          note: "Фруктовый сок из концентрата." },
+        { name: "Canned Soft Drink", ru: "Газировка в банке", cost: 10, tier: "Cheap", page: "331",
+          note: "Сладкая газировка; в бадегах стоит у кассы отдельным рядком." },
+        { name: "Canned Goods", ru: "Консервы (общий вид)", cost: 10, tier: "Cheap", page: "338",
+          note: "Строка «Canned Goods» ночного рынка: любая консервированная еда." },
+        { name: "Packaged Goods", ru: "Фасованные продукты", cost: 10, tier: "Cheap", page: "338",
+          note: "Упакованные снеки, крекеры, соевые чипсы." },
+        { name: "Frozen Goods", ru: "Заморозка", cost: 10, tier: "Cheap", page: "338",
+          note: "Пакеты замороженной еды — держатся только при наличии морозильника." },
+        { name: "Bags of Grain", ru: "Мешок зерна", cost: 20, tier: "Everyday", page: "338",
+          note: "Сырое зерно: база для похлёбки или перепродажи." },
+        { name: "Kibble Pack", ru: "Kibble Pack (одна порция)", cost: 10, tier: "Cheap", page: "351",
+          note: "Фольгированный пакет сухих cereal-вафель на один приём пищи; бренд только по номеру." },
+        { name: "MRE", ru: "Армейский сухой паёк (MRE)", cost: 10, tier: "Cheap", page: "351",
+          note: "Самонагревающийся мешок: добавить воду, щёлкнуть клапан — горячая еда через 2 минуты." },
+        { name: "Food Stick", ru: "Пищевой брусок", cost: 10, tier: "Cheap", page: "351",
+          note: "Зернистый сухой батончик одного из (мерзких) вкусов — один приём пищи." },
+        { name: "Bag of Prepak", ru: "Пакет prepak-еды", cost: 20, tier: "Everyday", page: "339",
+          note: "Прессованная готовая еда в упаковке — самый дешёвый способ не голодать." }
+      ]
+    },
+    {
+      title: "Свежее и живое (бадега / ночной рынок)",
+      items: [
+        { name: "Live Chicken", ru: "Живая курица", cost: 50, tier: "Costly", page: "339",
+          note: "Птица на убой — редкая роскошь настоящего мяса." },
+        { name: "Live Fish", ru: "Живая рыба", cost: 50, tier: "Costly", page: "339",
+          note: "Продаётся в ведре с водой; дешевле размороженной, но требует готовки." },
+        { name: "Live Pigs", ru: "Поросята", cost: 100, tier: "Premium", page: "339",
+          note: "Живой поросёнок: мясо, но нужен уход и место." },
+        { name: "Fresh Fruits", ru: "Свежие фрукты", cost: 50, tier: "Costly", page: "339",
+          note: "Настоящие фрукты — признак достатка." },
+        { name: "Fresh Vegetables", ru: "Свежие овощи", cost: 50, tier: "Costly", page: "339",
+          note: "Овощи с гидрофермы или каравана поставщиков." },
+        { name: "Root Vegetables", ru: "Корнеплоды", cost: 20, tier: "Everyday", page: "339",
+          note: "Картофель, репа, свёкла — самая доступная настоящая еда." },
+        { name: "Exotic Fruits", ru: "Экзотические фрукты", cost: 100, tier: "Premium", page: "339",
+          note: "Манго, питахайя и прочие чудеса оранжерей." },
+        { name: "Exotic Vegetables", ru: "Экзотические овощи", cost: 100, tier: "Premium", page: "339",
+          note: "Редкие сорта овощей для гурманов и корпоративных столовых." },
+        { name: "Soy Milk", ru: "Соевое молоко", cost: 10, tier: "Cheap", page: "332",
+          note: "Картон соевого молока — классика бадеги («отправьте игроков за соевым молоком»)." }
+      ]
+    },
+    {
+      title: "Напитки и заведения (стр. 339, 376)",
+      items: [
+        { name: "Poor Quality Alcohol", ru: "Пьянь низшего сорта", cost: 10, tier: "Cheap", page: "339",
+          note: "Самогон «на троих» из подсобки бадеги; ДV на стойкость пригодится." },
+        { name: "Alcohol", ru: "Алкоголь (обычный)", cost: 20, tier: "Everyday", page: "339",
+          note: "Бутылка крепкого из обычного отдела." },
+        { name: "Excellent Quality Alcohol", ru: "Хорошой выдержки алкоголь", cost: 100, tier: "Premium", page: "339",
+          note: "Настоящий алкоголь — подарок, который не стыдно принести в гости." },
+        { name: "Drink, Dive Bar", ru: "Бокал в грязном баре", cost: 10, tier: "Cheap", page: "376",
+          note: "Услуга заведения: кружка разбавленного пива." },
+        { name: "Drink, Good Bar", ru: "Бокал в хорошем баре", cost: 10, tier: "Cheap", page: "376",
+          note: "Приличная выпивка в приличном месте." },
+        { name: "Drink, Excellent Bar", ru: "Бокал в отличном баре", cost: 20, tier: "Everyday", page: "376",
+          note: "Коктейль с настоящим спиртом и льдом." },
+        { name: "Drink, Executive Bar", ru: "Бокал в корпоративном баре", cost: 50, tier: "Costly", page: "376",
+          note: "Бар с охраной, дресс-кодом и ценами для менеджеров." },
+        { name: "Restaurant Meal, Fast Food", ru: "Еда в фастфуде", cost: 10, tier: "Cheap", page: "376",
+          note: "Быстрый перекус у прилавка." },
+        { name: "Restaurant Meal, Good", ru: "Обед в хорошем ресторане", cost: 20, tier: "Everyday", page: "376",
+          note: "Садитесь и ешьте — входит в образ жизни Generic Prepak." },
+        { name: "Restaurant Meal, Excellent", ru: "Ужин в отличном ресторане", cost: 50, tier: "Costly", page: "376",
+          note: "Полноценный ужин с обслуживанием." },
+        { name: "Restaurant Meal, World Class", ru: "Ресторан мирового класса", cost: 500, tier: "Expensive", page: "376",
+          note: "Столик в лучшем зале Найт-Сити — часть образа жизни Fresh Food." },
+        { name: "Taxi", ru: "Такси", cost: 20, tier: "Everyday", page: "376",
+          note: "Поездка по городу; водилы торгуются и берут за риск." }
+      ]
+    }
+  ]
+};
+
+
+// 5) ОДЕЖДА И ФЕШЕН (Fashion) — Core Rulebook, стр. 356 + Style & Glamour (стр. 116)
+
+// ДАННЫЕ МАГАЗИНОВ — Cyberpunk RED
+// Источник: Data/Cyberpunk Red Core Rulebook v1.25.pdf,
+//   «Night Market Appendix» (стр. 340–376) и раздел
+//   «The New Street Economy» (стр. 336–377).
+// Формат записей:
+//   name / ru  — английское название по книге и перевод для отображения
+//   cost       — цена в эдди (eb)
+//   tier       — градация стоимости по книге (Cheap / Everyday / Costly / …)
+//   page       — страница печатного издания (Core Rulebook)
+//   note       — краткое описание механики из таблиц книги
+//   damage / mag / rof / hands / conceal / skill — оружие (стр. 340–341)
+//   sp / penalty                                 — броня (стр. 350)
+//   hl / install                                 — киберимпланты (стр. 358–367)
+//   size                                         — одежда: Bottoms/Top/Jacket/Footwear/…
+//   kind                                         — расходники: ammo / battery / chip / drug
+//   unit                                         — единица продажи патронов (10 шт. или 1 шт.)
+// ============================================================
+
+
+const CLOTHING = {
+  id: "clothing",
+  ru: "Одежда",
+  en: "Clothing & Fashion",
+  icon: "🧥",
+  src: "Core Rulebook, стр. 356 (Fashion), 116 (Style & Glamour Cyberware), 339 (ночной рынок · Clothing and Fashionware)",
+  hint: "Каждая модная линия покупается по предметам: низ, верх, куртка, обувь, украшения, зеркальные очки, очки, линзы, головные уборы.",
+  groups: [
+    {
+      title: "Модные линии (Fashion, стр. 356)",
+      items: [
+        { name: "Bag Lady Chic", ru: "Bag Lady Chic — «бомжатский шик»", cost: 10, tier: "Cheap", size: "все предметы", page: "356",
+          tags: "Homeless · Ragged · Vagrant",
+          note: "Цены по строке таблицы: Top/Hats/Glasses 10eb, остальное 20eb, Jacket/Footwear 20eb." },
+        { name: "Gang Colors", ru: "Gang Colors — «цветa банды»", cost: 20, tier: "Everyday", size: "все предметы", page: "356",
+          tags: "Dangerous · Violent · Rebellious",
+          note: "Bottoms/Jacket/Jewelry/Mirrorshades 50eb, Top/Footwear/Hats 20eb, Glasses/Contacts 10eb." },
+        { name: "Generic Chic", ru: "Generic Chic — «стандартный шик»", cost: 20, tier: "Everyday", size: "все предметы", page: "356",
+          tags: "Standard · Colorful · Modular",
+          note: "Bottoms/Jacket/Jewelry/Mirrorshades 50eb, Top/Footwear/Hats 20eb, Glasses/Contacts 10eb." },
+        { name: "Bohemian", ru: "Bohemian — «бохо»", cost: 20, tier: "Everyday", size: "все предметы", page: "356",
+          tags: "Folksy · Retro · Free Spirited",
+          note: "Top 20eb; Bottoms/Jacket/Footwear/Jewelry/Mirrorshades/Glasses 50eb; Hats 10eb." },
+        { name: "Leisurewear", ru: "Leisurewear — «спортивный стиль»", cost: 20, tier: "Everyday", size: "все предметы", page: "356",
+          tags: "Comfort · Agility · Athleticism",
+          note: "Top 20eb; Bottoms/Jacket/Jewelry/Mirrorshades 100eb; Footwear/Glasses/Hats 50eb; Contacts 50eb." },
+        { name: "Nomad Leathers", ru: "Nomad Leathers — «кожа кочевников»", cost: 20, tier: "Everyday", size: "все предметы", page: "356",
+          tags: "Western · Rugged · Tribal",
+          note: "Top 20eb; Bottoms/Jacket/Footwear/Jewelry/Mirrorshades 100eb; Glasses 50eb; Hats 20eb; Contacts 100eb." },
+        { name: "Asia Pop", ru: "Asia Pop — «японский поп»", cost: 20, tier: "Everyday", size: "все предметы", page: "356",
+          tags: "Bright · Costume-like · Youthful",
+          note: "Top 20eb; всё остальное (Bottoms, Jacket, Footwear, Jewelry, Mirrorshades, Glasses, Hats, Contacts) 100eb." },
+        { name: "Urban Flash", ru: "Urban Flash — «городской блеск»", cost: 20, tier: "Everyday", size: "все предметы", page: "356",
+          tags: "Flashy · Technological · Streetwear",
+          note: "Top 20eb; всё остальное 100eb." },
+        { name: "Businesswear", ru: "Businesswear — «деловой стиль»", cost: 50, tier: "Costly", size: "все предметы", page: "356",
+          tags: "Leadership · Presence · Authority",
+          note: "Top 50eb; Bottoms/Jacket/Footwear/Jewelry/Glasses/Hats/Contacts 500eb; Mirrorshades 5000eb." },
+        { name: "High Fashion", ru: "High Fashion — «высокая мода»", cost: 500, tier: "Expensive", size: "все предметы", page: "356",
+          tags: "Exclusive · Designer · Couture",
+          note: "Top 500eb; Bottoms/Jacket/Footwear/Jewelry/Glasses/Hats/Contacts 1000eb; Mirrorshades 50000eb." }
+      ]
+    },
+    {
+      title: "Предметы одежды (по строкам таблицы, стр. 356)",
+      items: [
+        { name: "Bottoms", ru: "Низ (брюки, юбка)", cost: 20, tier: "Everyday", size: "Bottoms", page: "356",
+          note: "От 10eb (Bag Lady) до 1000eb (High Fashion)." },
+        { name: "Top", ru: "Верх (футболка, рубашка)", cost: 20, tier: "Everyday", size: "Top", page: "356",
+          note: "Самая дешёвая позиция почти во всех линиях: 10–500eb." },
+        { name: "Jacket", ru: "Куртка / пиджак", cost: 20, tier: "Everyday", size: "Jacket", page: "356",
+          note: "От 20eb до 5000eb (Businesswear) и 50000eb (High Fashion)." },
+        { name: "Footwear", ru: "Обувь", cost: 20, tier: "Everyday", size: "Footwear", page: "356",
+          note: "От 10eb до 1000eb." },
+        { name: "Jewelry", ru: "Украшения", cost: 10, tier: "Cheap", size: "Jewelry", page: "356",
+          note: "От 10eb до 5000eb." },
+        { name: "Mirrorshades", ru: "Зеркальные очки", cost: 10, tier: "Cheap", size: "Mirrorshades", page: "356",
+          note: "От 10eb до 50000eb за пару." },
+        { name: "Glasses", ru: "Очки (корригирующие)", cost: 10, tier: "Cheap", size: "Glasses", page: "356",
+          note: "От 10eb до 5000eb; есть Smart Glasses (500eb) — см. «Расходники»/«Кибервар»." },
+        { name: "Contact Lenses", ru: "Контактные линзы", cost: 10, tier: "Cheap", size: "Contact Lenses", page: "356",
+          note: "От 10eb до 5000eb." },
+        { name: "Hats", ru: "Головные уборы", cost: 10, tier: "Cheap", size: "Hats", page: "356",
+          note: "От 10eb до 5000eb." }
+      ]
+    },
+    {
+      title: "Стиль и гламур (Style & Glamour Cyberware, стр. 116)",
+      items: [
+        { name: "Biomonitor", ru: "Биомонитор (фешенвар)", cost: 100, tier: "Premium", page: "116",
+          note: "Светодиодный дисплей состояния тела под кожей — можно связать с Агентом." },
+        { name: "Chemskin", ru: "Хемскин (фешенвар)", cost: 100, tier: "Premium", page: "116",
+          note: "Стойкие пигменты кожи: от маскировки дефектов до неоново-зелёного окраса." },
+        { name: "EMP Threading", ru: "ЭМП-нити (фешенвар)", cost: 10, tier: "Cheap", page: "116",
+          note: "Серебряные «дорожки» по телу: чисто косметика." },
+        { name: "Light Tattoo", ru: "Светотатуировка (фешенвар)", cost: 100, tier: "Premium", page: "116",
+          note: "Подкожные светящиеся рисунки; большие работы требуют нескольких установок." },
+        { name: "Shift Tacts", ru: "Shift Tacts (фешенвар)", cost: 100, tier: "Premium", page: "116",
+          note: "Линзы с меняющимся цветом и узором." },
+        { name: "Skinwatch", ru: "Skinwatch (фешенвар)", cost: 100, tier: "Premium", page: "116",
+          note: "Циферблат времени и даты прямо под кожей." },
+        { name: "Techhair", ru: "Techhair (фешенвар)", cost: 100, tier: "Premium", page: "116",
+          note: "Искусственные светящиеся волосы с мотором." },
+        { name: "Plastic Covering", ru: "Пластиковое покрытие киберконечности", cost: 100, tier: "Premium", page: "367",
+          note: "Цветное полимерное покрытие — слот не занимает." },
+        { name: "Realskinn™ Covering", ru: "Покрытие Realskinn™", cost: 500, tier: "Expensive", page: "367",
+          note: "Искусственная кожа для киберконечности." },
+        { name: "Superchrome® Covering", ru: "Покрытие Superchrome®", cost: 1000, tier: "Very Expensive", page: "367",
+          note: "Зеркальный хром: +2 к Стилю и одежде." },
+        { name: "Personal CarePak", ru: "Набор ухода за собой (CarePak)", cost: 20, tier: "Everyday", page: "351",
+          note: "Зубная щётка с пастой, салфетки для всего тела, депиляционная паста, расчёска." },
+        { name: "Glow Paint", ru: "Светящаяся краска", cost: 20, tier: "Everyday", page: "351",
+          note: "Баллончик фотолюминесцентной краски — для отметок и тегов." }
+      ]
+    }
+  ]
+};
+
+
+// Порядок: 1) cyberware, 2) оружие, 3) расходники, 4) бакалея, 5) одежда.
+const SHOPS = [CYBERWARE, WEAPONS, CONSUMABLES, GROCERY, CLOTHING];
+
+/* ------------------------------------------------------------
    [3] ШРИФТЫ PDF — js/pdf-fonts.js (генерируется tools/make_pdf_fonts.py)
    ------------------------------------------------------------ */
 // ============================================================
