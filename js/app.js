@@ -1308,6 +1308,39 @@ function toast(msg) {
 }
 
 // ------------------------------------------------------------
+// Панель генерации персонажа: скрытие / показ (кнопка «◀ Панель» в шапке)
+// Состояние запоминается в localStorage, есть горячая клавиша Ctrl+B.
+// ------------------------------------------------------------
+const CONTROLS_LS_KEY = "cp-red-controls-hidden";
+
+function controlsGetHidden() {
+  try { return localStorage.getItem(CONTROLS_LS_KEY) === "1"; } catch { return false; }
+}
+
+function applyControlsVisibility(hidden) {
+  document.body.classList.toggle("controls-hidden", hidden);
+  const btn = $("btn-toggle-controls");
+  if (btn) {
+    btn.textContent = hidden ? "▶ Панель" : "◀ Панель";
+    btn.setAttribute("aria-expanded", String(!hidden));
+    btn.title = hidden
+      ? "Показать панель генерации персонажа (Ctrl+B)"
+      : "Скрыть панель генерации персонажа (Ctrl+B)";
+  }
+}
+
+function toggleControlsPanel() {
+  const hidden = !document.body.classList.contains("controls-hidden");
+  applyControlsVisibility(hidden);
+  try { localStorage.setItem(CONTROLS_LS_KEY, hidden ? "1" : "0"); } catch { /* приватный режим */ }
+}
+
+function initControlsToggle() {
+  applyControlsVisibility(controlsGetHidden()); // восстанавливаем состояние после перезагрузки
+  $("btn-toggle-controls")?.addEventListener("click", toggleControlsPanel);
+}
+
+// ------------------------------------------------------------
 // Магазины: кнопка «Открыть магазин» и модальное окно выбора
 // Данные — src/shops/*.js (SHOPS), таблицы Core Rulebook, Night Market Appendix
 // ------------------------------------------------------------
@@ -1491,6 +1524,9 @@ function init() {
   $("btn-save").addEventListener("click", saveCharacter);
   $("btn-print").addEventListener("click", () => window.print());
 
+  // Скрытие/показ левой панели генерации персонажа (кнопка «◀ Панель» в шапке)
+  initControlsToggle();
+
   // Магазин: кнопка в шапке открывает модальное окно выбора магазина
   $("btn-shop")?.addEventListener("click", openShopModal);
   $("shop-back")?.addEventListener("click", () => showShopCatalog(false));
@@ -1499,6 +1535,17 @@ function init() {
     el.addEventListener("click", closeShopModal));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("shop-modal")?.classList.contains("hidden")) closeShopModal();
+  });
+
+  // Горячая клавиша Ctrl+B — скрыть/показать панель генерации (не срабатывает в полях ввода)
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "b") {
+      const t = e.target;
+      const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+      if (typing) return;
+      e.preventDefault();
+      toggleControlsPanel();
+    }
   });
 
   // Экспорт в .xlsx / .pdf / .json

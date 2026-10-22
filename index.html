@@ -18,6 +18,7 @@
       <small>Лист персонажа · Найт-Сити 2045 · данные: Data/Cyberpunk Red Core Rulebook v1.25.pdf</small>
     </div>
     <div class="head-actions">
+      <button class="btn ghost" id="btn-toggle-controls" type="button" aria-expanded="true" aria-controls="controls-panel" title="Скрыть / показать панель генерации персонажа (Ctrl+B)">◀ Панель</button>
       <button class="btn primary" id="btn-shop" type="button" title="Открыть магазин Найт-Сити: киберимпланты, оружие, расходники, бакалея, одежда">🛒 Открыть магазин</button>
       <button class="btn ghost" id="btn-print" type="button">Печать</button>
       <button class="btn" id="btn-save" type="button">Сохранить</button>
@@ -38,7 +39,7 @@
 
   <main class="layout">
     <!-- ===== Панель управления ===== -->
-    <aside class="controls">
+    <aside class="controls" id="controls-panel">
       <section class="mode-panel">
         <h2>Роль персонажа</h2>
         <label>

@@ -104,6 +104,12 @@ body {
 
 /* ---------- панель управления ---------- */
 .controls { display: flex; flex-direction: column; gap: 14px; }
+/* скрытие левой панели генерации персонажа (переключается кнопкой «◀ Панель» в шапке) */
+body.controls-hidden .controls { display: none; }
+body.controls-hidden .layout { grid-template-columns: 1fr 260px; }
+@media (max-width: 1200px) {
+  body.controls-hidden .layout { grid-template-columns: 1fr; }
+}
 .mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .mode-tab {
   border: 1px solid var(--line); background: var(--panel); color: var(--muted);
