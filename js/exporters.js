@@ -157,6 +157,14 @@ export function parseImportedJSON(text) {
   c.hum ??= (c.stats.EMP || 0) * 10;
   c.cash ??= 0;
   c.lifepath ||= [];
+  // старые/импортированные записи пути без ключей пунктов — дополняем по порядку,
+  // чтобы панель «Выбрать вручную» корректно работала и с импортированными листами
+  if (typeof LIFEPATH_FIELDS !== "undefined") {
+    c.lifepath.forEach((lp, i) => {
+      const f = LIFEPATH_FIELDS[i];
+      if (f) { lp.key ||= f.key; lp.label ||= f.label; lp.icon ||= f.icon; }
+    });
+  }
   c.gear ||= [];
   return c;
 }

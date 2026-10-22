@@ -58,15 +58,231 @@ const NICKS = ["Призрак","Кобра","Искра","Ворон","Стал
 const STYLES = ["неон и хром", "рваный гранж", "строгий корпоративный крой", "панк-латка на куртке",
   "тактические разгрузки", "яркая безумная раскраска", "кожа, шипы, цепи", "дождевые пончо и маски"];
 
-const LIFE_PATH = [
-  { label: "Дом", icon: "🏚️", items: ["трущобы Уэстсайда", "пригород Бадландс", "община кочевников", "корпоративный квартал Пиквика", "плавучий дом в доках"] },
-  { label: "Значимое событие", icon: "💥", items: ["четвёртая корпоративная война", "пожар в Найт-Сити", "эпидемия киберпсихоза", "зачистка банд", "прорыв Кокпита"] },
-  { label: "Проблемы", icon: "⚠️", items: ["долг фиксеру", "розыск корпорации", "зависимость от чипов", "предательство близкого человека", "метка банды"] },
-  { label: "Черта личности", icon: "🎭", items: ["циничный прагматик", "верный до конца", "одержимый справедливостью", "азартный авантюрист", "замкнутый профессионал"] },
-  { label: "Контакты", icon: "🤝", items: ["информатор в полиции", "бармен из «Afterlife»", "контрабандист из портов", "нетраннер-наставник", "полеовой медик"] },
-  { label: "Цель", icon: "🎯", items: ["выйти из тени и стать легендой", "найти того, кто предал семью", "сорвать контракт корпорации", "сколотить состояние и уйти на юг", "пережить 2046-й"] }
+// ------------------------------------------------------------
+// ЖИЗНЕННЫЙ ПУТЬ (Cyberpunk RED Core Rulebook, «Tales from the Street», стр. 43–52)
+// Механика книги: «Roll 1d10 or choose one» — каждый пункт можно
+// вытянуть кубиком ИЛИ выбрать вручную. Пункты личных данных:
+// культурное происхождение, личность, одежда/причёска/особенность,
+// что ценишь выше всего, отношение к людям, самый близкий человек,
+// самая ценная вещь, происхождение семьи, окружение (детство),
+// семейный кризис, друзья, враги, трагическая любовь, жизненные цели.
+// Плюс роль-специфичный путь: «тип» роли (1d10 или 1d6 — см. таблицы
+// конкретных ролей, стр. 53–67).
+// Тексты вариантов — перевод таблиц книги.
+// ------------------------------------------------------------
+const LIFEPATH_FIELDS = [
+  { key: "culture",     label: "Культурное происхождение", icon: "🌍", dice: 10 },
+  { key: "personality", label: "Личность",                 icon: "🎭", dice: 10 },
+  { key: "clothing",    label: "Стиль одежды",             icon: "👕", dice: 10 },
+  { key: "hair",        label: "Причёска",                 icon: "💇", dice: 10 },
+  { key: "affectation", label: "Отличительная черта",      icon: "📿", dice: 10 },
+  { key: "value",       label: "Что ценишь выше всего",    icon: "⚖️", dice: 10 },
+  { key: "people",      label: "Отношение к людям",        icon: "👥", dice: 10 },
+  { key: "closePerson", label: "Самый близкий человек",    icon: "❤️", dice: 10 },
+  { key: "valuable",    label: "Самая ценная вещь",        icon: "🔧", dice: 10 },
+  { key: "family",      label: "Происхождение семьи",      icon: "🏠", dice: 10 },
+  { key: "childhood",   label: "Окружение (детство)",      icon: "🧒", dice: 10 },
+  { key: "crisis",      label: "Семейный кризис",          icon: "💥", dice: 10 },
+  { key: "friends",     label: "Друзья",                   icon: "🤝", dice: 10, count: true },
+  { key: "enemies",     label: "Враги",                    icon: "🗡️", dice: 10, count: true },
+  { key: "love",        label: "Трагическая любовь",       icon: "💔", dice: 10, count: true },
+  { key: "goal",        label: "Жизненные цели",           icon: "🎯", dice: 10 },
+  { key: "roleType",    label: "Путь роли · тип",          icon: "🛤️", dice: 10, roleSpecific: true }
 ];
 
+// Общие таблицы (для всех ролей). Индекс массива = выпавшему числу − 1.
+const LIFEPATH_OPTIONS = {
+  culture: [
+    "Североамериканец","Южно-/Центральноамериканец","Западноевропеец","Восточноевропеец",
+    "Ближний Восток / Северная Африка","Чернокожий африканец (Африка к югу от Сахары)","Южноазиатский",
+    "Юго-восточный азиат","Восточноазиатский","Океания / тихоокеанский островитянин"
+  ],
+  personality: [
+    "Застенчивый и скрытный","Бунтарский, антисоциальный, агрессивный","Высокомерный, гордый, отстранённый",
+    "Переменчивый, опрометчивый, своевольный","Привередливый, суетливый, нервный","Рассудительный и серьёзный",
+    "Глноватый и легкомысленный","Хитрый и обманчивый","Интеллектуальный и отстранённый","Дружелюбный и общительный"
+  ],
+  clothing: [
+    "Generic Chic (стандартное, яркое, модульное)","Leisurewear (удобство, подвижность, атлетизм)",
+    "Urban Flash (броское, технологичное, уличное)","Businesswear (лидерство, присутствие, авторитет)",
+    "High Fashion (эксклюзив, дизайнер, haute couture)","Bohemian (простонародное, ретро, свободное)",
+    "Bag Lady Chic (бомжатское, рваное, бродяжье)","Gang Colors (опасное, агрессивное, бунтарское)",
+    "Nomad Leathers (вестерн, грубое, племенное)","Asia Pop (яркое, костюмоподобное, молодёжное)"
+  ],
+  hair: [
+    "Ирокез","Длинные и лохматые","Короткие и торчащие","Дикие, во все стороны","Лысый","В полоску",
+    "Дикие цвета","Опрятные и короткие","Короткие и кудрявые","Длинные и прямые"
+  ],
+  affectation: [
+    "Татуировки","Зеркальные очки","Ритуальные шрамы","Перчатки с шипами","Кольцо в носу",
+    "Пирсинг языка или иной","Странные ногтевые импланты","Ботинки или каблуки с шипами",
+    "Перчатки без пальцев","Странные линзы"
+  ],
+  value: [
+    "Деньги","Честь","Данное слово","Честность","Знание","Месть","Любовь","Власть","Семья","Дружба"
+  ],
+  people: [
+    "Держусь нейтрально.","Держусь нейтрально.","Нравится почти каждый.","Ненавижу почти всех.",
+    "Люди — инструмент. Используй ради своих целей, затем выбрасывай.","Каждый человек — ценная личность.",
+    "Люди — препятствия, которые надо уничтожить, если они мне мешают.","Люди ненадёжны. Никому не доверяй.",
+    "Выжгите их всех, пусть тараканы наследят землю.","Люди прекрасны!"
+  ],
+  closePerson: [
+    "Родитель","Брат или сестра","Возлюбленный(-ая)","Друг","Ты сам","Питомец","Учитель или наставник",
+    "Публичная фигура","Личный герой","Никто"
+  ],
+  valuable: [
+    "Оружие","Инструмент","Предмет одежды","Фотография","Книга или дневник","Запись",
+    "Музыкальный инструмент","Ювелирное украшение","Игрушка","Письмо"
+  ],
+  family: [
+    "Корпоративные элиты (Corporate Execs)","Корпоративные менеджеры (Corporate Managers)",
+    "Корпоративные техники (Corporate Technicians)","Кочевой пак (Nomad Pack)",
+    "«Семья» гангера (Ganger Family)","Бойцы зон боевых действий (Combat Zoners)",
+    "Городские бездомные (Urban Homeless)","Крысы мегаструктур (Megastructure Warren Rats)",
+    "Переселенцы-восстановители (Reclaimers)","Эджраннеры (Edgerunners)"
+  ],
+  childhood: [
+    "Жизнь на улице без присмотра взрослых","Безопасная Корпоративная Зона за стеной от остального города",
+    "Кочевой пак, кочующий с места на место","Кочевой пак с транспортными корнями (суда, самолёты, караваны)",
+    "Приходящий в упадок, кошмарный район, который защищают от байкеров","Сердце Зонового Боя, развалины и сквоты",
+    "Огромная «мегаструктура» под контролем корпорации или города","Руины покинутого города, занятые восстановителями",
+    "Флотская нация (Drift Nation) — плавающий офшорный город","Корпоративный «звездоскрёб» — роскошь над толпой"
+  ],
+  crisis: [
+    "Семья потеряла всё из-за предательства","Семья потеряла всё из-за плохого управления",
+    "Семью сослали или иначе изгнали из родного дома/нации/корпорации","Семья в заключении, ты один сбежал",
+    "Семья исчезла. Ты — единственный оставшийся её член","Семья убита, ты — единственный выживший",
+    "Семья связана с долгосрочным заговором, организацией или сообществом (мафия, революционная группа)",
+    "Семья рассеяна по свету из-за несчастного случая","Семья проклята родовой враждой, длящейся поколениями",
+    "Ты наследник семейного долга; должен его отдать, прежде чем жить дальше"
+  ],
+  friends: [
+    "Как старший брат/сестра для тебя","Как младший брат/сестра для тебя","Учитель или наставник",
+    "Напарник или коллега","Бывшая возлюбленная","Старый враг","Как родитель для тебя",
+    "Друг детства","Кто-то с улицы","Человек с общими интересами или целью"
+  ],
+  enemies: [
+    "Бывший друг","Бывшая возлюбленная","Очутившийся в стороне родственник","Враг ещё с детства",
+    "Человек, работающий на тебя","Человек, которому ты служишь","Партнёр или коллега",
+    "Корпоративный исполнитель","Правительственный чиновник","Бустергангер"
+  ],
+  love: [
+    "Возлюбленный(-ая) погиб в несчастливом случае","Возлюбленный(-ая) загадочно исчез",
+    "Просто не срослось","Личная цель или вендетта встали между вами","Возлюбленного(-ую) похитили",
+    "Возлюбленный(-ая) сошёл с ума или стал(а) киберпсихом","Возлюбленный(-ая) покончил(а) с собой",
+    "Возлюбленный(-ая) был(а) убит(а) в драке","Соперник вытеснил тебя","Возлюбленный(-ая) в заключении или в изгнании"
+  ],
+  goal: [
+    "Избавиться от дурной репутации","Обрести власть и контроль","Свалить с улиц любой ценой",
+    "Причинять боль и страдания всем, кто перешёл тебе дорогу","Прожить прошлое заново и постараться забыть",
+    "Найти ответственных за твою жалкую жизнь и заставить их заплатить","Забрать то, что по праву твоё",
+    "Спасти (если возможно) кого-то из твоего прошлого — любимого или члена семьи",
+    "Обрести славу и признание","Стать тем, кого боятся и уважают"
+  ]
+};
+
+// Роль-специфичный путь (Role-Based Lifepaths, стр. 53–67).
+// По книге первый вопрос — «What Kind of <Роль> are You?»:
+// у Rockerboy/Medtech/Tech/Fixer/Exec — 1d10, у остальных — 1d6.
+const ROLE_TYPE_TABLES = {
+  Rockerboy: { dice: 10, options: [
+    "Музыкант","Слэм-поэт","Уличный художник","Перформанс-художник","Комик","Оратор","Политик","Рэп-артист","DJ","Идору"
+  ]},
+  Solo: { dice: 6, options: [
+    "Телохранитель","Уличная мышца на побегушках","Корпоративный силовик с побочными заказами",
+    "Корпоративный или фриланс-агент чёрных операций","Местный мститель-наёмник","Ассасин / хитмен на побегушках"
+  ]},
+  Netrunner: { dice: 6, options: [
+    "Фрилансер, взламывающий за деньги","Корпоративный «клонраннер» на хозяина",
+    "Хактивист, вскрывающий системы и разоблачающий злодеев","Ломаешь системы просто ради фана",
+    "Часть постоянной команды фрилансеров","Хакаешь для медиа, политика или законника по найму"
+  ]},
+  Tech: { dice: 10, options: [
+    "Техник киберимплантов","Автомеханик","Мастер на все руки","Техник мелкой электроники",
+    "Оружейник","Сумасшедший изобретатель","Механик роботов и дронов","Механик тяжёлой техники",
+    "Сборщик-старатель","Судомеханик"
+  ]},
+  Medtech: { dice: 10, options: [
+    "Хирург","Терапевт общего профиля","Травммедик Trauma Team","Психиатр","Терапевт киберпсихов",
+    "Риппердок","Оператор криосистем","Фармацевт","Бодискальптор","Судебный патологоанатом"
+  ]},
+  Media: { dice: 6, options: [
+    "Блогер","Писатель (книги)","Видеограф","Документалист","Репортёр-расследователь","Летописец улицы"
+  ]},
+  Exec: { dice: 10, options: [
+    "Финансы","Медиа и коммуникации","Кибертехника и медицинские технологии","Фармацевтика и биотех",
+    "Продукты, одежда и товары широкого потребления","Энергетика","Бытовая электроника и робототехника",
+    "Корпоративные услуги","Потребительские сервисы","Недвижимость и строительство"
+  ]},
+  Lawman: { dice: 6, options: [
+    "Гвардия / охрана","Стандартный патруль","Уголовное расследование","Спецназ (SWAT)","Мото-патруль","Внутренние дела (IA)"
+  ]},
+  Fixer: { dice: 10, options: [
+    "Брокер сделок между враждующими бандами","Достаёшь редкие ресурсы для эксклюзивных клиентов",
+    "Брокер услуг соло и технарей как агент","Поставляешь регулярный ресурс ночным рынкам (еда, медикаменты, наркотики)",
+    "Достаёшь крайне нелегальный товар (уличные наркотики, военное оружие)","Снабжаешь техов и медиков запчастями и медикаментами",
+    "Держишь несколько ночных рынков, но не владелец","Брокер контрактов на тяжёлую технику, военную технику и авиацию",
+    "Брокер-скупщик у сборщиков, облавающих корпов и зоны боёв","Эксклюзивный агент медиа, рокербоя или кочевого пака"
+  ]},
+  Nomad: { dice: 10, options: [
+    "Гоу-банда (Gogang)","Пассажирский транспорт","Чотоква/школа (кочевая школа-лекторий)","Странствующее шоу/карнавал",
+    "Сезонные сельхозрабочие","Грузовой транспорт","Защита перевозок","Контрабанда","Наёмная армия","Строительная бригада"
+  ]}
+};
+
+// Число граней кубика для пункта пути (1d10 или 1d6 — как в книге)
+function dN(sides) { return 1 + Math.floor(Math.random() * sides); }
+
+// Варианты выбора для пункта пути. Общие таблицы одинаковы для всех ролей;
+// «Путь роли · тип» — таблица конкретного типа роли (стр. 53–67).
+function lifepathOptionsFor(fieldKey, roleName) {
+  if (fieldKey === "roleType") {
+    const t = ROLE_TYPE_TABLES[roleName];
+    return (t?.options || []).slice();
+  }
+  return (LIFEPATH_OPTIONS[fieldKey] || []).slice();
+}
+
+// Кубик для пункта: своя грань у roleType (Solo — 1d6, Rockerboy — 1d10),
+// остальные пункты — 1d10.
+function lifepathDice(field, roleName) {
+  if (field.roleSpecific) return ROLE_TYPE_TABLES[roleName]?.dice || field.dice || 10;
+  return field.dice || 10;
+}
+
+// Для пунктов Friends/Enemies/Love книга сначала бросает количество:
+// «roll 1d10 and subtract 7 (minimum 0)».
+function rollCount() { return Math.max(0, d10() - 7); }
+
+// Один пункт пути: результат броска кубика и текст варианта
+function rollLifepathItem(field, roleName) {
+  const options = lifepathOptionsFor(field.key, roleName);
+  const dice = lifepathDice(field, roleName);
+  const base = { key: field.key, label: field.label, icon: field.icon, dice, roll: null, value: "—" };
+  if (field.count) {
+    const n = rollCount();
+    if (!n) return { ...base, value: "Нет (бросок количества: 0)" };
+    const picks = [];
+    for (let i = 0; i < n; i++) picks.push(options[dN(dice) - 1]);
+    return { ...base, value: `${n}: ${picks.join(", ")}` };
+  }
+  if (!options.length) return base;
+  const roll = dN(dice);
+  return { ...base, roll, value: options[(roll - 1) % options.length] };
+}
+
+// Случайный жизненный путь целиком (по механике Cyberpunk RED)
+function rollLifepath(roleName) {
+  return LIFEPATH_FIELDS.map((f) => rollLifepathItem(f, roleName));
+}
+
+// Текстовое резюме пути — для подсказок
+function lifepathSummary(lp) {
+  return lp.map((x) => `${x.label}: ${x.value}`).join(" · ");
+}
+
+// Все варианты поля, подходящие данной роли (свои + общие)
 const GEAR_BY_ROLE = {
   default: ["кибердека нет (пока)", "броня Light Bodyshell", "комм", "нож", "аптечка первой помощи"],
   Solo: ["пистоль-пулемёт Malorian Arms 2045", "бронежилет Kiroshka+3", "травмы-набор", "нож-выживалка"],
@@ -177,6 +393,18 @@ function readIdentity() {
   return { name, nick, age, style };
 }
 
+// Путь для нового персонажа: если пользователь что-то выбрал вручную
+// в панели — берём его значения, недостающие пункты докидываем кубиками
+function buildLifepathOnCreate(roleName) {
+  if (!Object.values(lpManualPicks).some(Boolean)) return rollLifepath(roleName);
+  return LIFEPATH_FIELDS.map((f) => {
+    const val = lpManualPicks[f.key];
+    if (val) return { key: f.key, label: f.label, icon: f.icon,
+                      dice: lifepathDice(f, roleName), roll: null, value: val };
+    return rollLifepathItem(f, roleName);
+  });
+}
+
 function createCharacter(method, opts = {}) {
   const roleData = ROLES.find((r) => r.role === $("role-select").value) || solo;
   const gen = method === 3
@@ -203,14 +431,147 @@ function createCharacter(method, opts = {}) {
     hp: calcHP(gen.stats.BODY, gen.stats.WILL),
     hum: gen.stats.EMP * 10,
     skills: buildFullSkillList(rollSkills(roleData)),
-    lifepath: LIFE_PATH.map((lp) => ({ label: lp.label, icon: lp.icon, value: pick(lp.items) })),
+    // Жизненный путь: ручной выбор (если заполнен) или случайная генерация
+    lifepath: buildLifepathOnCreate(roleData.role),
     gear: GEAR_BY_ROLE[roleData.role] || GEAR_BY_ROLE.default,
     cash: 100 + Math.floor(Math.random() * 900) * 5
   };
   current = c;
+  lpManualPicks = {};   // черновик пути больше не нужен
+  if (lpEditorOpen) renderLpEditor();
   renderSheet(c);
   toast(`${c.name} «${c.nick}» — ${c.roleRu} создан (${METHODS[method].name})`);
   return c;
+}
+
+// ------------------------------------------------------------
+// ЖИЗНЕННЫЙ ПУТЬ — UI выбора: случайно или вручную по механике игры
+// «🎲 Сгенерировать случайно» — броски кубиков по таблицам книги;
+// «✍ Выбрать вручную» — панель, где для каждого пункта пути показаны
+// варианты из таблицы ИМЕННО ВЫБРАННОЙ РОЛИ («Путь роли» — 1d6,
+// остальные пункты — 1d10). Роль можно сменить и до создания персонажа.
+// ------------------------------------------------------------
+let lpEditorOpen = false;
+let lpDraftRole = null;   // роль, выбранная в списке ролей (для предпросмотра пути)
+let lpManualPicks = {};   // ручные выборы пользователя (пока персонаж не создан)
+
+// Сохранить/обновить жизненный путь текущего персонажа
+function applyLifepath(lp, msg) {
+  if (!current) { toast("Сначала создайте персонажа!"); return; }
+  current.lifepath = lp;
+  renderSheet(current);
+  if (msg) toast(msg);
+}
+
+// Случайная генерация пути по механике Cyberpunk RED
+function generateLifepath() {
+  if (!current) return toast("Сначала создайте персонажа!");
+  applyLifepath(rollLifepath(current.role), "Жизненный путь сгенерирован по таблицам игры");
+}
+
+// Показать/скрыть панель ручного выбора
+function toggleLpEditor(force) {
+  lpEditorOpen = force ?? !lpEditorOpen;
+  const box = $("lp-editor");
+  if (!box) return;
+  if (!lpEditorOpen) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  renderLpEditor();
+}
+
+// Текущий набор пунктов пути: у созданного персонажа — его путь,
+// до создания — предпросмотр по выбранной в списке роли
+function lifepathForEditor(roleName) {
+  if (current) return current.lifepath;
+  const items = LIFEPATH_FIELDS.map((f) => ({
+    key: f.key, label: f.label, icon: f.icon, dice: lifepathDice(f, roleName),
+    roll: null, value: lpManualPicks[f.key] || ""
+  }));
+  // если путь ещё не генерировали — один случайный предпросмотр
+  if (!items.some((x) => x.value)) {
+    const rolled = rollLifepath(roleName);
+    rolled.forEach((r, i) => Object.assign(items[i], r));
+  }
+  return items;
+}
+
+function renderLpEditor() {
+  const box = $("lp-editor");
+  if (!box) return;
+  const roleName = current ? current.role : ($("role-select")?.value || "Solo");
+  const roleRu = current ? current.roleRu : (ROLE_RU[roleName] || roleName);
+  const items = current ? current.lifepath : lifepathForEditor(roleName);
+  box.innerHTML = `
+    <h3 class="lp-editor-title">Жизненный путь · роль «${roleRu}» ${current ? "" : "(предпросмотр до создания)"}
+      <span class="small muted">по книге: «Roll 1d10 or choose one» — бросай кубик или выбирай сам</span></h3>
+    <div class="lp-steps">
+      ${LIFEPATH_FIELDS.map((f, i) => {
+        const options = lifepathOptionsFor(f.key, roleName);
+        const cur = items.find((x) => x.key === f.key);
+        const curVal = cur ? cur.value : "";
+        const inList = options.includes(curVal);
+        const dice = lifepathDice(f, roleName);
+        const diceLbl = f.count ? `кол-во: 1d10−7 (мин. 0), затем [1d${dice}]` : `1d${dice}`;
+        return `
+          <div class="lp-step" data-lp="${i}">
+            <div class="lp-step-label">${f.icon} ${f.label} <span class="dice-tag">[${diceLbl}]</span>${cur && cur.roll ? ` <span class="roll">(выпало ${cur.roll})</span>` : ""}</div>
+            <select class="lp-pick" data-key="${f.key}" aria-label="Выбор: ${f.label}">
+              <option value="" ${!curVal ? "selected" : ""}>— выбрать —</option>
+              ${!inList && curVal ? `<option value="${curVal}" selected>${curVal} (своё)</option>` : ""}
+              ${options.map((o) =>
+                `<option value="${o}" ${o === curVal ? "selected" : ""}>${o}</option>`).join("")}
+            </select>
+            <button type="button" class="btn tiny lp-reroll" data-key="${f.key}"
+                    title="Перебросить этот пункт (${diceLbl})">🎲 Бросить</button>
+          </div>`;
+      }).join("")}
+    </div>
+    <div class="gen-row">
+      ${current
+        ? `<button type="button" class="btn primary" id="btn-lp-apply">Применить выбор</button>`
+        : `<button type="button" class="btn primary" id="btn-lp-use-draft">Использовать этот путь при создании</button>`}
+      <button type="button" class="btn" id="btn-lp-roll-all">🎲 Случайно всем пунктам</button>
+    </div>`;
+
+  box.querySelectorAll("select.lp-pick").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      if (current) {
+        const item = current.lifepath.find((x) => x.key === sel.dataset.key);
+        if (item) { item.value = sel.value; item.roll = null; }
+      } else {
+        lpManualPicks[sel.dataset.key] = sel.value;
+      }
+    });
+  });
+  box.querySelectorAll("button.lp-reroll").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const f = LIFEPATH_FIELDS.find((x) => x.key === btn.dataset.key);
+      const rolled = rollLifepathItem(f, roleName);
+      if (current) {
+        const item = current.lifepath.find((x) => x.key === f.key) || current.lifepath[LIFEPATH_FIELDS.indexOf(f)];
+        Object.assign(item, rolled);
+        renderLpEditor();
+        toast(`${f.label}: ${rolled.value} (выпало ${rolled.roll})`);
+      } else {
+        lpManualPicks[f.key] = rolled.value;
+        renderLpEditor();
+      }
+    });
+  });
+  $("btn-lp-apply")?.addEventListener("click", () => {
+    applyLifepath(current.lifepath, "Жизненный путь обновлён: " + lifepathSummary(current.lifepath));
+  });
+  $("btn-lp-use-draft")?.addEventListener("click", () => {
+    toast("Путь учтён: осталось создать персонажа кнопкой внизу панели");
+  });
+  $("btn-lp-roll-all")?.addEventListener("click", () => {
+    if (current) {
+      current.lifepath = rollLifepath(current.role);
+    } else {
+      rollLifepath(roleName).forEach((r) => (lpManualPicks[r.key] = r.value));
+    }
+    renderLpEditor();
+  });
 }
 
 // ------------------------------------------------------------
@@ -297,11 +658,16 @@ function renderSheet(c) {
 
   renderSkillsTable(c);
 
+  // Жизненный путь: значения + результат броска (1d10 / 1d6 — как в книге;
+  // у пунктов «Друзья/Враги/Трагическая любовь» книга сначала бросает количество)
   $("lifepath").innerHTML = c.lifepath
     .map((lp) => `
       <div class="lp-row">
         <span class="lp-icon">${lp.icon}</span>
-        <span><small>${lp.label}:</small> <p>${lp.value}</p></span>
+        <span>
+          <small>${lp.label}:${lp.roll ? ` <b class="lp-roll">(1d${lp.dice || 10} = ${lp.roll})</b>` : ""}</small>
+          <p>${lp.value}</p>
+        </span>
       </div>`)
     .join("") + `<p class="small muted" style="margin-top:8px;">${c.note}</p>`;
 
@@ -566,6 +932,9 @@ function init() {
        <p><b>Навыки роли (${r.skills.length}):</b> ${r.skills.map(skillRu).join(", ")}</p>
        <p class="muted">Таблица шаблонов: 10 строк × 10 характеристик (Core Rulebook, стр. 74–77).</p>`;
     if (!$("buy-box").classList.contains("hidden")) openBuyPanel();
+    // при смене роли до создания персонажа сбрасываем черновик пути —
+    // «Путь роли» зависит от таблицы выбранной роли
+    if (!current) { lpManualPicks = {}; if (lpEditorOpen) renderLpEditor(); }
   });
   $("role-info").textContent = "Выберите роль — таблицы характеристик взяты из Core Rulebook (стр. 74–77).";
 
@@ -622,6 +991,10 @@ function init() {
 
   renderSaved();
   sel.dispatchEvent(new Event("change"));
+
+  // Жизненный путь: сгенерировать случайно / выбрать вручную
+  $("btn-lp-roll")?.addEventListener("click", generateLifepath);
+  $("btn-lp-pick")?.addEventListener("click", () => toggleLpEditor());
 }
 
 // Если DOM уже готов — запускаем сразу; иначе ждём DOMContentLoaded
