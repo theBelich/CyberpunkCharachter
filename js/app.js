@@ -4,7 +4,8 @@
 //   Способ №1 «Уличная крыса» (Streetrats)      — стр. 73–77
 //   Способ №2 «Эджраннер» (Edgerunners)         — стр. 77
 //   Способ №3 «Полный пакет» (Complete Packages)— стр. 78
-// Роли и таблицы шаблонов: src/roles/*.js
+// Роли, таблицы шаблонов характеристик и списки навыков: src/roles/*.js
+// Справочник навыков (названия и связка «навык → характеристика»): data/skills.js
 // ============================================================
 
 import { solo } from "../src/roles/solo.js";
@@ -17,6 +18,7 @@ import { medtech } from "../src/roles/medtech.js";
 import { exec } from "../src/roles/exec.js";
 import { media } from "../src/roles/media.js";
 import { lawman } from "../src/roles/lawman.js";
+import { SKILL_BY_NAME } from "../data/skills.js";
 
 const ROLES = [solo, netrunner, rockerboy, nomad, fixer, tech, medtech, exec, media, lawman];
 
@@ -34,37 +36,10 @@ const STAT_RU = {
   WILL: "Воля", LUCK: "Удача", MOVE: "Скорость", BODY: "Телосложение", EMP: "Эмпатия"
 };
 
-const SKILL_RU = {
-  "Athletics": "Атлетика", "Brawling": "Рукопашный бой", "Concentration": "Концентрация",
-  "Conversation": "Обходительность", "Education": "Образование", "Evasion": "Изворотливость",
-  "First Aid": "Первая помощь", "Human Perception": "Чутьё на людей",
-  "Language (Streetslang)": "Язык (уличный жаргон)", "Local Expert (Your Home)": "Знаток местности (дом)",
-  "Perception": "Внимательность", "Persuasion": "Убедительность", "Stealth": "Скрытность",
-  "Autofire (x2)": "Автогон (x2)", "Handgun": "Пистолеты", "Interrogation": "Допрос",
-  "Melee Weapon": "Холодное оружие", "Resist Torture/Drugs": "Стойкость (пытки/наркотики)",
-  "Shoulder Arms": "Длинноствольное оружие", "Tactics": "Тактика",
-  "Cryptography": "Криптография", "Cybertech": "Кибертехника", "Demolitions": "Подрывное дело",
-  "Electronic Warfare": "Радиоэлектронная борьба", "Interface": "Интерфейс", "Netrunning": "Нетраннинг",
-  "Research": "Исследования", "Sleaze": "Грязные трюки", "Broadcast": "Эфир",
-  "Compose": "Композиция", "Play Instrument": "Игра на инструменте", "Sing": "Пение",
-  "Style (Rockerboy)": "Стиль (рокербой)", "Animal Handling": "Обращение с животными",
-  "Drive Land Vehicle": "Вождение (наземный транспорт)", "Tracking": "Слежение",
-  "Trading": "Торговля", "Wilderness Survival": "Выживание в дикой природе",
-  "Awareness": "Наблюдательность", "Bribery": "Подкуп", "Combat Training": "Боевая подготовка",
-  "Crimery": "Криминал", "Forgery": "Подделка документов", "Knowledge (Fixing)": "Знания (фиксинг)",
-  "Leadership": "Лидерство", "Networking": "Связи", "Biology": "Биология", "Chemistry": "Химия",
-  "Diagnose": "Диагностика", "Medicine": "Медицина", "Pharmacology": "Фармакология",
-  "Surgery": "Хирургия", "Treat Psychoactive Drugs": "Лечение психоактивных веществ",
-  "Administer": "Администрирование", "Computer": "Компьютеры", "Corporate Politics": "Политика корпораций",
-  "Creditsheet": "Кредитная карточка", "Demeanor (Exec)": "Манера держаться (корпорат)",
-  "Endure Alcohol/Drugs": "Переносимость алкоголя/наркотиков", "Focus": "Сосредоточенность",
-  "Intimidation": "Запугивание", "Polite": "Вежливость", "Routing": "Маршрутизация",
-  "Research (Media)": "Исследования (журналист)", "Style (Media)": "Стиль (журналист)",
-  "Write": "Тексты", "Artists' Lore": "Легенды об артистах", "Law": "Закон",
-  "Street Cop": "Уличный коп", "Style (Cop)": "Стиль (коп)"
-};
-
-const skillRu = (s) => SKILL_RU[s] || s;
+// Русское название навыка берётся из справочника data/skills.js
+const skillRu = (s) => SKILL_BY_NAME[s]?.ru || s;
+// Характеристика, используемая в проверке навыка (data/skills.js)
+const skillStat = (s) => SKILL_BY_NAME[s]?.stat || "—";
 
 // ------------------------------------------------------------
 // Случайные данные для оформления листа (в духе правил)
@@ -170,14 +145,27 @@ const METHODS = {
 
 // ------------------------------------------------------------
 // Создание персонажа целиком
+// Пользовательские данные (имя / возраст / стиль) берутся из панели
+// «Данные персонажа»; если поля пустые — значения выбираются случайно.
 // ------------------------------------------------------------
 let current = null;
+
+function readIdentity() {
+  const name = $("inp-name")?.value.trim() || "";
+  const nick = $("inp-nick")?.value.trim() || "";
+  const ageRaw = Number($("inp-age")?.value);
+  const age = Number.isFinite(ageRaw) && ageRaw >= 15 && ageRaw <= 80 ? Math.round(ageRaw) : null;
+  const style = $("sel-style")?.value || "";
+  return { name, nick, age, style };
+}
 
 function createCharacter(method, opts = {}) {
   const roleData = ROLES.find((r) => r.role === $("role-select").value) || solo;
   const gen = method === 3
     ? METHODS[3].fn(roleData, opts.points ?? Number($("rank-select")?.value || 62))
     : METHODS[method].fn(roleData);
+
+  const id = readIdentity();
 
   const c = {
     created: Date.now(),
@@ -186,10 +174,10 @@ function createCharacter(method, opts = {}) {
     note: gen.note,
     role: roleData.role,
     roleRu: ROLE_RU[roleData.role] || roleData.role,
-    name: pick(NAMES),
-    nick: pick(NICKS),
-    age: 18 + Math.floor(Math.random() * 30),
-    style: pick(STYLES),
+    name: id.name || pick(NAMES),
+    nick: id.nick || pick(NICKS),
+    age: id.age ?? (18 + Math.floor(Math.random() * 30)),
+    style: id.style || pick(STYLES),
     stats: gen.stats,
     statsOrder: roleData.statsOrder,
     hp: calcHP(gen.stats.BODY, gen.stats.WILL),
@@ -231,11 +219,7 @@ function renderSheet(c) {
   $("d-hum").textContent = c.hum;
   $("d-move").textContent = c.stats.MOVE;
 
-  $("skills-body").innerHTML = c.skills
-    .slice()
-    .sort((a, b) => b.level - a.level)
-    .map((s) => `<tr class="${s.level === 0 ? "zero" : ""}"><td>${skillRu(s.name)}</td><td class="lvl">${s.level}</td></tr>`)
-    .join("");
+  renderSkillsTable(c);
 
   $("lifepath").innerHTML = c.lifepath
     .map((lp) => `
@@ -247,6 +231,49 @@ function renderSheet(c) {
 
   $("gear-list").innerHTML = c.gear.map((g) => `<li>${g}</li>`).join("");
   $("ch-cash").textContent = c.cash.toLocaleString("ru-RU") + " эдди";
+}
+
+// ------------------------------------------------------------
+// Таблица навыков: название | характеристика | редактируемый уровень | сумма (уровень + характеристика)
+// ------------------------------------------------------------
+const SKILL_MIN = 0, SKILL_MAX = 10;
+
+function skillRowHtml(s, i, c) {
+  const stat = skillStat(s.name);
+  const statVal = c.stats[stat];
+  const sum = (typeof statVal === "number" ? statVal : 0) + s.level;
+  return `
+    <tr class="${s.level === 0 ? "zero" : ""}" data-skill="${i}">
+      <td>${skillRu(s.name)}</td>
+      <td class="attr-tag" title="${STAT_RU[stat] || stat}">${stat}</td>
+      <td class="lvl">
+        <input type="number" class="lvl-input" min="${SKILL_MIN}" max="${SKILL_MAX}" step="1"
+               value="${s.level}" aria-label="Уровень навыка: ${skillRu(s.name)}" />
+      </td>
+      <td class="mod">${sum}</td>
+    </tr>`;
+}
+
+function renderSkillsTable(c) {
+  const body = $("skills-body");
+  body.innerHTML = c.skills
+    .slice()
+    .sort((a, b) => b.level - a.level)
+    .map((s) => skillRowHtml(s, c.skills.indexOf(s), c))
+    .join("");
+
+  // при изменении уровня — обновляем данные персонажа и пересобираем таблицу
+  body.querySelectorAll("input.lvl-input").forEach((inp) => {
+    inp.addEventListener("change", () => {
+      const idx = Number(inp.closest("tr").dataset.skill);
+      let v = Math.round(Number(inp.value));
+      if (!Number.isFinite(v)) v = SKILL_MIN;
+      v = Math.max(SKILL_MIN, Math.min(SKILL_MAX, v));
+      current.skills[idx].level = v;
+      inp.value = v;
+      renderSkillsTable(current);
+    });
+  });
 }
 
 // ------------------------------------------------------------
@@ -352,6 +379,14 @@ function toast(msg) {
 // Инициализация
 // ------------------------------------------------------------
 function init() {
+  // Выпадающий список «Стиль» (панель «Данные персонажа»)
+  const styleSel = $("sel-style");
+  if (styleSel) {
+    styleSel.innerHTML =
+      `<option value="">— случайно —</option>` +
+      STYLES.map((s) => `<option value="${s}">${s}</option>`).join("");
+  }
+
   const sel = $("role-select");
   sel.innerHTML = ROLES
     .map((r) => `<option value="${r.role}">${ROLE_RU[r.role] || r.role} (${r.role})</option>`)
@@ -385,7 +420,7 @@ function init() {
     current.hp = calcHP(buyStats.BODY, buyStats.WILL);
     current.hum = buyStats.EMP * 10;
     current.note = `«Полный пакет»: очки распределены вручную (${total} очков)`;
-    renderSheet(current);
+    renderSheet(current); // пересобираем лист, включая сумму «уровень + характеристика» у навыков
     toast("Характеристики обновлены");
   });
 
