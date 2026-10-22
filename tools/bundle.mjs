@@ -59,6 +59,12 @@ const roleChunks = ROLE_FILES.map((r) => {
 const skillsSrc = deModule(read("data/skills.js"))
   + "\n\n" + deModule(read("data/role-abilities.js"));
 
+// ---------- [2a] Магазины: src/shops/*.js (каждый магазин — отдельный файл) ----------
+const SHOP_FILES = ["cyberware", "weapons", "consumables", "grocery", "clothing"];
+const shopsSrc = SHOP_FILES.map((s) => deModule(read(`src/shops/${s}.js`))).join("\n\n")
+  + "\n\n// Порядок: 1) cyberware, 2) оружие, 3) расходники, 4) бакалея, 5) одежда.\n"
+  + "const SHOPS = [CYBERWARE, WEAPONS, CONSUMABLES, GROCERY, CLOTHING];";
+
 // ---------- [3] Экспортёры: js/exporters.js ----------
 const exportersSrc = deModule(read("js/exporters.js"));
 
@@ -104,6 +110,11 @@ ${roleChunks.join(",\n")}};
    [2] НАВЫКИ — data/skills.js (справочник, Core Rulebook стр. 82–85)
    ------------------------------------------------------------ */
 ${skillsSrc.trim()}
+`,
+  `/* ------------------------------------------------------------
+   [2a] МАГАЗИНЫ — src/shops/*.js (Core Rulebook, Night Market Appendix)
+   ------------------------------------------------------------ */
+${shopsSrc.trim()}
 `,
   `/* ------------------------------------------------------------
    [3] ШРИФТЫ PDF — js/pdf-fonts.js (генерируется tools/make_pdf_fonts.py)
