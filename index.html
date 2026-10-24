@@ -19,24 +19,29 @@
       <small>Лист персонажа · Найт-Сити 2045 · данные: Data/Cyberpunk Red Core Rulebook v1.25.pdf</small>
     </div>
     <div class="head-actions">
-      <button class="btn primary" id="btn-shop" type="button" title="Открыть магазин Найт-Сити: киберимпланты, оружие, расходники, бакалея, одежда">🛒 Открыть магазин</button>
-      <button class="btn ghost notes-toggle" id="btn-toggle-notes" type="button" aria-expanded="false" aria-controls="notes-col">📝 Заметки</button>
-      <button class="btn ghost" id="btn-print" type="button">Печать</button>
-      <button class="btn" id="btn-save" type="button">Сохранить</button>
+      <button class="btn primary" id="btn-shop" type="button" aria-label="Открыть магазин" title="Открыть магазин Найт-Сити: киберимпланты, оружие, расходники, бакалея, одежда">🛒 <span>Магазин</span></button>
+      <button class="btn ghost notes-toggle" id="btn-toggle-notes" type="button" aria-label="Открыть заметки" aria-expanded="false" aria-controls="notes-col">📝 <span>Заметки</span></button>
+      <details class="head-more" id="head-more">
+        <summary class="btn ghost" aria-label="Открыть расширенное меню"><span class="head-more-icon" aria-hidden="true">☰</span><span class="head-more-label"> Ещё</span></summary>
+        <div class="head-more-menu">
+          <div class="head-secondary-actions">
+            <button class="btn ghost" id="btn-print" type="button">Печать</button>
+            <button class="btn" id="btn-save" type="button">Сохранить</button>
+          </div>
+          <section class="export-bar" aria-label="Экспорт и импорт персонажа">
+            <span class="export-label">Экспорт листа:</span>
+            <button class="btn tiny" id="btn-export-xlsx" type="button" title="Скачать лист персонажа в формате Excel (.xlsx)">⬇ .xlsx</button>
+            <button class="btn tiny" id="btn-export-pdf" type="button" title="Скачать лист персонажа в формате PDF (.pdf)">⬇ .pdf</button>
+            <button class="btn tiny" id="btn-export-json" type="button" title="Скачать данные персонажа в формате JSON (.json)">⬇ Экспорт JSON</button>
+            <span class="export-sep"></span>
+            <button class="btn tiny ghost" id="btn-import-json" type="button" title="Открыть персонажа из JSON-файла (или перетащите .json файл на страницу)">⬆ Импорт JSON</button>
+            <input type="file" id="inp-import-file" accept=".json,application/json" class="hidden-file" aria-label="Файл персонажа JSON" />
+            <span class="muted small">Совет: для PDF с кириллицей и полным оформлением используйте «Печать» → «Сохранить как PDF».</span>
+          </section>
+        </div>
+      </details>
     </div>
   </header>
-
-  <!-- ===== Экспорт / импорт ===== -->
-  <section class="export-bar" aria-label="Экспорт и импорт персонажа">
-    <span class="export-label">Экспорт листа:</span>
-    <button class="btn tiny" id="btn-export-xlsx" type="button" title="Скачать лист персонажа в формате Excel (.xlsx)">⬇ .xlsx</button>
-    <button class="btn tiny" id="btn-export-pdf" type="button" title="Скачать лист персонажа в формате PDF (.pdf)">⬇ .pdf</button>
-    <button class="btn tiny" id="btn-export-json" type="button" title="Скачать данные персонажа в формате JSON (.json)">⬇ .json</button>
-    <span class="export-sep"></span>
-    <button class="btn tiny ghost" id="btn-import-json" type="button" title="Открыть персонажа из JSON-файла (или перетащите .json файл на страницу)">⬆ Импорт .json</button>
-    <input type="file" id="inp-import-file" accept=".json,application/json" class="hidden-file" aria-label="Файл персонажа JSON" />
-    <span class="muted small">Совет: для PDF с кириллицей и полным оформлением используйте «Печать» → «Сохранить как PDF».</span>
-  </section>
 
   <main class="layout">
     <!-- ===== Панель управления ===== -->

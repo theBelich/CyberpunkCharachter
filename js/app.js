@@ -1529,6 +1529,22 @@ function initSheetTabs() {
   });
 }
 
+function initHeaderMenu() {
+  const menu = $("head-more");
+  if (!menu) return;
+  menu.open = false;
+
+  menu.querySelector(".head-more-menu")?.addEventListener("click", (event) => {
+    if (event.target.closest("button")) menu.open = false;
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && menu.open) {
+      menu.open = false;
+      menu.querySelector("summary")?.focus();
+    }
+  });
+}
+
 // ------------------------------------------------------------
 // Toast
 // ------------------------------------------------------------
@@ -2184,6 +2200,7 @@ function init() {
   renderSaved();
   initGearEditing();
   initSheetTabs();
+  initHeaderMenu();
   initNotes();   // поле заметок игрока (правая колонка)
   sel.dispatchEvent(new Event("change"));
 
