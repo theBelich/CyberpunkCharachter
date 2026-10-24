@@ -1779,7 +1779,8 @@ function buildSheetData(c, dict) {
       ["Бодрость (HP)", `${c.hp} / ${c.hp}`],
       ["Тяжело ранен (порог)", Math.ceil(c.hp / 2)],
       ["Спасбросок от смерти", c.stats.BODY],
-      ["Человечность (HUM)", c.hum],
+      ["Человечность (текущая / максимум)", `${c.hum} / ${(c.empMax ?? c.stats.EMP) * 10}`],
+      ["Эмпатия (текущая / максимальная)", `${Math.floor(c.hum / 10)} / ${c.empMax ?? c.stats.EMP}`],
       ["Скорость (MOVE)", c.stats.MOVE],
       ["Наличные (эдди)", c.cash]
     ],
@@ -1842,7 +1843,9 @@ function parseImportedJSON(text) {
   c.note ||= "Импортирован из файла";
   c.statsOrder ||= Object.keys(c.stats);
   c.hp ??= calcHPFromStats(c);
-  c.hum ??= (c.stats.EMP || 0) * 10;
+  c.empMax = Math.max(0, Number(c.empMax ?? c.stats.EMP) || 0);
+  c.hum = Math.max(0, Math.min(Number(c.hum ?? c.empMax * 10) || 0, c.empMax * 10));
+  c.stats.EMP = Math.floor(c.hum / 10);
   c.cash ??= 0;
   c.lifepath ||= [];
   // старые/импортированные записи пути без ключей пунктов — дополняем по порядку,
@@ -2322,7 +2325,8 @@ function exportPDF(c, dict) {
     [`HP ${c.hp}/${c.hp}`, CP.red],
     [`тяжело ранен ${Math.ceil(c.hp / 2)}`, CP.yellow],
     [`смерть ${c.stats.BODY}`, CP.red],
-    [`HUM ${c.hum}`, CP.cyan],
+    [`HUM ${c.hum}/${(c.empMax ?? c.stats.EMP) * 10}`, CP.cyan],
+    [`EMP ${Math.floor(c.hum / 10)}/${c.empMax ?? c.stats.EMP}`, CP.cyan],
     [`MOVE ${c.stats.MOVE}`, CP.cyan]
   ];
   {
@@ -2825,6 +2829,15 @@ const d10 = () => 1 + Math.floor(Math.random() * 10);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const $ = (id) => document.getElementById(id);
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // Бодрость по таблице Core Rulebook (стр. 79): HP = 10 + ceil((BODY+WILL)/2)*5
 function calcHP(body, will) {
   return 10 + Math.ceil((body + will) / 2) * 5;
@@ -2951,6 +2964,7 @@ function createCharacter(method, opts = {}) {
     statEdits: 0,
     hp: calcHP(gen.stats.BODY, gen.stats.WILL),
     hum: gen.stats.EMP * 10,
+    empMax: gen.stats.EMP,
     skills: buildFullSkillList(rollSkills(roleData)),
     // Жизненный путь: ручной выбор (если заполнен) или случайная генерация
     lifepath: buildLifepathOnCreate(roleData.role),
@@ -3029,7 +3043,7 @@ function renderLpEditor() {
   const roleRu = current ? current.roleRu : (ROLE_RU[roleName] || roleName);
   const items = current ? current.lifepath : lifepathForEditor(roleName);
   box.innerHTML = `
-    <h3 class="lp-editor-title">Жизненный путь · роль «${roleRu}» ${current ? "" : "(предпросмотр до создания)"}
+    <h3 class="lp-editor-title">Жизненный путь · роль «${escapeHtml(roleRu)}» ${current ? "" : "(предпросмотр до создания)"}
       <span class="small muted">по книге: «Roll 1d10 or choose one» — бросай кубик или выбирай сам</span></h3>
     <div class="lp-steps">
       ${LIFEPATH_FIELDS.map((f, i) => {
@@ -3039,17 +3053,18 @@ function renderLpEditor() {
         const inList = options.includes(curVal);
         const dice = lifepathDice(f, roleName);
         const diceLbl = f.count ? `кол-во: 1d10−7 (мин. 0), затем [1d${dice}]` : `1d${dice}`;
+        const safeCurVal = escapeHtml(curVal || "");
         return `
           <div class="lp-step" data-lp="${i}">
-            <div class="lp-step-label">${f.icon} ${f.label} <span class="dice-tag">[${diceLbl}]</span>${cur && cur.roll ? ` <span class="roll">(выпало ${cur.roll})</span>` : ""}</div>
-            <select class="lp-pick" data-key="${f.key}" aria-label="Выбор: ${f.label}">
+            <div class="lp-step-label">${f.icon} ${escapeHtml(f.label)} <span class="dice-tag">[${escapeHtml(diceLbl)}]</span>${cur && cur.roll ? ` <span class="roll">(выпало ${cur.roll})</span>` : ""}</div>
+            <select class="lp-pick" data-key="${f.key}" aria-label="Выбор: ${escapeHtml(f.label)}">
               <option value="" ${!curVal ? "selected" : ""}>— выбрать —</option>
-              ${!inList && curVal ? `<option value="${curVal}" selected>${curVal} (своё)</option>` : ""}
+              ${!inList && curVal ? `<option value="${safeCurVal}" selected>${safeCurVal} (своё)</option>` : ""}
               ${options.map((o) =>
-                `<option value="${o}" ${o === curVal ? "selected" : ""}>${o}</option>`).join("")}
+                `<option value="${escapeHtml(o)}" ${o === curVal ? "selected" : ""}>${escapeHtml(o)}</option>`).join("")}
             </select>
             <button type="button" class="btn tiny lp-reroll" data-key="${f.key}"
-                    title="Перебросить этот пункт (${diceLbl})">🎲 Бросить</button>
+                    title="Перебросить этот пункт (${escapeHtml(diceLbl)})">🎲 Бросить</button>
           </div>`;
       }).join("")}
     </div>
@@ -3121,7 +3136,11 @@ function applyStatChange(key, rawValue) {
 
   // пересчёт производных величин
   current.hp = calcHP(current.stats.BODY, current.stats.WILL);
-  current.hum = current.stats.EMP * 10;
+  if (key === "EMP") {
+    current.empMax = clamped;
+    current.hum = clamped * 10;
+  }
+  current.stats.EMP = Math.floor(current.hum / 10);
 
   const baseNote = (current.baseNote ??= current.note || "");
   const edits = (current.statEdits = (current.statEdits || 0) + 1);
@@ -3170,7 +3189,76 @@ function renderRoleAbility(c) {
 // ------------------------------------------------------------
 // Отрисовка листа
 // ------------------------------------------------------------
+const ROLE_GEAR_WEAPON_HINTS = {
+  Solo: { damage: "2d6" }, Rockerboy: { damage: "2d6" },
+  Nomad: { damage: "5d6" }, Fixer: { damage: "2d6" },
+  Tech: { damage: "5d6" }, Medtech: { damage: "2d6" },
+  Exec: { damage: "2d6" }, Lawman: { damage: "2d6" },
+};
+const ROLE_GEAR_ARMOR_HINTS = {
+  default: { sp: 11 }, Solo: { sp: 13 }, Netrunner: { sp: 7 },
+  Nomad: { sp: 4 }, Lawman: { sp: 13 }, Media: { sp: 11 },
+};
+const ROLE_GEAR_WEAPON_ITEMS = {
+  Solo: GEAR_BY_ROLE.Solo[0], Rockerboy: GEAR_BY_ROLE.Rockerboy[3],
+  Nomad: GEAR_BY_ROLE.Nomad[2], Fixer: GEAR_BY_ROLE.Fixer[0],
+  Tech: GEAR_BY_ROLE.Tech[3], Medtech: GEAR_BY_ROLE.Medtech[3],
+  Exec: GEAR_BY_ROLE.Exec[2], Lawman: GEAR_BY_ROLE.Lawman[0],
+};
+const ROLE_GEAR_ARMOR_ITEMS = {
+  default: GEAR_BY_ROLE.default[1], Solo: GEAR_BY_ROLE.Solo[1],
+  Netrunner: GEAR_BY_ROLE.Netrunner[3], Nomad: GEAR_BY_ROLE.Nomad[0],
+  Media: GEAR_BY_ROLE.Media[3], Lawman: GEAR_BY_ROLE.Lawman[3],
+};
+
+function classifyGearItem(g, c) {
+  if (!g) return null;
+  const name = String(typeof g === "object" ? g.name || "" : g).toLowerCase();
+  if (typeof g === "object") {
+    if (g.weapon) return "weapon";
+    if (g.armor) return "armor";
+  }
+  const englishName = (name.match(/\(([^)]+)\)\s*$/) || [])[1] || name;
+  const item = WEAPONS.groups.flatMap((group) => group.items)
+    .find((entry) => entry.name.toLowerCase() === englishName.trim());
+  if (item?.damage) return "weapon";
+  if (item?.sp != null) return "armor";
+  if (/оружие|пистолет|пистоль|винтовк|дробовик|пулемёт|автомат|ружь|карабин|нож/.test(name)) return "weapon";
+  if (/брон|жилет|armor|кевлар|kevlar|flak|пластин/.test(name)) return "armor";
+  if (typeof g === "string" && Array.isArray(c?.gear) && c.gear.includes(g)) {
+    const role = Object.keys(GEAR_BY_ROLE).find((key) => key !== "default" && GEAR_BY_ROLE[key].includes(g));
+    if (role && ROLE_GEAR_WEAPON_ITEMS[role] === g) return "weapon";
+    if (role && ROLE_GEAR_ARMOR_ITEMS[role] === g) return "armor";
+    if (!role && ROLE_GEAR_ARMOR_ITEMS.default === g) return "armor";
+    if (/нож/.test(name)) return "weapon";
+  }
+  return null;
+}
+
+function baseStatsFor(kind, name) {
+  const text = String(name || "").toLowerCase();
+  const englishName = (text.match(/\(([^)]+)\)\s*$/) || [])[1] || text;
+  const item = WEAPONS.groups.flatMap((group) => group.items)
+    .find((entry) => entry.name.toLowerCase() === englishName.trim());
+  if (item) return kind === "armor" ? { sp: item.sp } : { damage: item.damage };
+  const role = Object.keys(GEAR_BY_ROLE).find((key) => key !== "default" && GEAR_BY_ROLE[key].includes(name));
+  if (role) {
+    if (kind === "weapon" && ROLE_GEAR_WEAPON_ITEMS[role] === name) return ROLE_GEAR_WEAPON_HINTS[role] || {};
+    if (kind === "armor" && ROLE_GEAR_ARMOR_ITEMS[role] === name) return ROLE_GEAR_ARMOR_HINTS[role] || ROLE_GEAR_ARMOR_HINTS.default;
+  }
+  if (kind === "armor" && ROLE_GEAR_ARMOR_ITEMS.default === name) return ROLE_GEAR_ARMOR_HINTS.default;
+  return {};
+}
+
 function renderSheet(c) {
+  if (!Number.isFinite(c.empMax)) {
+    c.empMax = Math.max(Number(c.stats.EMP) || 0, Math.ceil((Number(c.hum) || 0) / 10));
+  }
+  const empMax = c.empMax;
+  const humanityMax = empMax * 10;
+  c.hum = Math.max(0, Math.min(Number(c.hum) || 0, humanityMax));
+  c.stats.EMP = Math.floor(c.hum / 10);
+
   $("ch-name").textContent = `${c.name} «${c.nick}»`;
   $("ch-role").textContent = c.roleRu;
   $("ch-realname").textContent = c.name;
@@ -3220,7 +3308,9 @@ function renderSheet(c) {
   $("d-hp").textContent = `${c.hp} / ${c.hp}`;
   $("d-sw").textContent = Math.ceil(c.hp / 2);
   $("d-ds").textContent = c.stats.BODY;
-  $("d-hum").textContent = c.hum;
+  const currentEmp = Math.floor(c.hum / 10);
+  $("d-hum").textContent = `${c.hum} / ${humanityMax}`;
+  $("d-emp").textContent = `${currentEmp} / ${empMax}`;
   $("d-move").textContent = c.stats.MOVE;
 
   renderSkillsTable(c);
@@ -3230,37 +3320,208 @@ function renderSheet(c) {
   $("lifepath").innerHTML = c.lifepath
     .map((lp) => `
       <div class="lp-row">
-        <span class="lp-icon">${lp.icon}</span>
+        <span class="lp-icon">${escapeHtml(lp.icon || "")}</span>
         <span>
-          <small>${lp.label}:${lp.roll ? ` <b class="lp-roll">(1d${lp.dice || 10} = ${lp.roll})</b>` : ""}</small>
-          <p>${lp.value}</p>
+          <small>${escapeHtml(lp.label || "")}:${lp.roll ? ` <b class="lp-roll">(1d${lp.dice || 10} = ${lp.roll})</b>` : ""}</small>
+          <p>${escapeHtml(lp.value || "")}</p>
         </span>
       </div>`)
-    .join("") + `<p class="small muted" style="margin-top:8px;">${c.note}</p>`;
+    .join("") + `<p class="small muted" style="margin-top:8px;">${escapeHtml(c.note || "")}</p>`;
 
   // Инвентарь: строки могут быть текстом (снаряжение роли / старые сохранения)
   // или объектом { name, cost, implant? } — предметы, купленные в магазине.
   // Киберимпланты (флаг implant:true, ставится при покупке в магазине
   // «Киберимпланты») выделены в отдельный список под названием «Импланты».
-  const gearItemHtml = (g) => {
+  const gearItemHtml = (g, index) => {
     const isObj = g && typeof g === "object";
     const label = isObj ? g.name : g;
-    const price = isObj && Number(g.cost) > 0
-      ? ` <b class="gear-cost">(${Number(g.cost).toLocaleString("ru-RU")} eb)</b>` : "";
-    return `<li>${label}${price}</li>`;
+    const safeLabel = escapeHtml(label ?? "");
+    const kind = classifyGearItem(g, c);
+    const stats = kind ? baseStatsFor(kind, label) : {};
+    const damage = kind === "weapon" ? (isObj ? g.damage : "") || stats.damage || "" : "";
+    const sp = kind === "armor" ? (isObj && g.sp != null ? g.sp : stats.sp) : "";
+    const cost = isObj && Number.isFinite(Number(g.cost)) ? Number(g.cost) : "";
+    const activeKey = kind === "armor" ? c.activeArmor : c.activeWeapon;
+    const isActive = !!kind && ((isObj && g.active) || activeKey === label);
+    const activeTag = isObj && g.active
+      ? ` <b class="gear-active-tag">${g.weapon ? "⚔️ активно" : g.armor ? "🛡️ активна" : "★ активно"}</b>` : "";
+    return `<li class="gear-row">
+      <span class="gear-item-name">${safeLabel}${activeTag}</span>
+      <span class="gear-damage" aria-label="Урон, количество кубов">${damage ? escapeHtml(damage) : "—"}</span>
+      <span class="gear-sp" aria-label="SP брони">${sp !== "" && sp != null ? escapeHtml(sp) : "—"}</span>
+      <span class="gear-cost" aria-label="Цена">${cost !== "" ? `${cost.toLocaleString("ru-RU")} eb` : "—"}</span>
+      <span class="gear-actions">
+        ${kind ? `<button class="btn tiny ghost gear-equip-btn" type="button" data-gear-index="${index}" data-gear-kind="${kind}" title="${kind === "armor" ? "Назначить активной бронёй" : "Назначить активным оружием"}" ${isActive ? "disabled" : ""}>${isActive ? "Активно" : "Назначить"}</button>` : ""}
+        <button class="btn tiny ghost gear-edit-btn" type="button" data-gear-index="${index}" aria-label="Редактировать ${safeLabel}">✎</button>
+      </span>
+      <form class="gear-edit-form" data-gear-index="${index}" hidden>
+        <label>Название<input name="name" type="text" maxlength="100" required value="${escapeHtml(label ?? "")}"></label>
+        <label>Цена, eb<input name="cost" type="number" min="0" step="1" value="${cost}"></label>
+        ${kind === "weapon" ? `<label>Урон (кубы)<input name="damage" type="text" maxlength="24" placeholder="например, 2d6" value="${escapeHtml(damage)}"></label>` : ""}
+        ${kind === "armor" ? `<label>SP брони<input name="sp" type="number" min="0" step="0.1" value="${sp ?? ""}"></label>` : ""}
+        <div class="gear-edit-actions">
+          <button class="btn tiny primary" type="submit">Сохранить</button>
+          <button class="btn tiny ghost gear-edit-cancel" type="button">Отмена</button>
+        </div>
+      </form>
+    </li>`;
   };
   const implants = c.gear.filter(isImplantGear);
-  const otherGear = c.gear.filter((g) => !isImplantGear(g));
+  const otherGear = c.gear.map((g, index) => ({ g, index })).filter(({ g }) => !isImplantGear(g));
   $("gear-list").innerHTML = otherGear.length
-    ? otherGear.map(gearItemHtml).join("")
+    ? otherGear.map(({ g, index }) => gearItemHtml(g, index)).join("")
     : `<li class="muted">${implants.length ? "Нет обычного снаряжения." : "Нет данных — персонаж ещё не создан."}</li>`;
-  const impBox = $("implants-box");
-  if (impBox) {
-    impBox.classList.toggle("hidden", !implants.length);
-    $("implants-count").textContent = `(${implants.length})`;
-    $("implants-list").innerHTML = implants.map(gearItemHtml).join("");
+  $("implants-count").textContent = `(${implants.length})`;
+  $("implants-list").innerHTML = c.gear.map((g, index) => ({ g, index }))
+    .filter(({ g }) => isImplantGear(g))
+    .map(({ g, index }) => gearItemHtml(g, index)).join("");
+  $("implants-empty").hidden = implants.length > 0;
+  renderLoadout(c);
+  $("ch-cash").value = c.cash;
+  $("ch-cash").disabled = false;
+  $("inp-gear-name").disabled = false;
+  $("inp-gear-cost").disabled = false;
+  $("manual-gear-form").querySelector("button[type='submit']").disabled = false;
+}
+
+function addManualGear() {
+  if (!current) { toast("Сначала создайте персонажа!"); return; }
+  const nameInput = $("inp-gear-name");
+  const costInput = $("inp-gear-cost");
+  const name = nameInput.value.trim();
+  if (!name) { toast("Введите название снаряжения."); nameInput.focus(); return; }
+
+  const costText = costInput.value.trim();
+  const cost = costText === "" ? null : Number(costText);
+  if (cost !== null && (!Number.isInteger(cost) || cost < 0)) {
+    toast("Цена должна быть неотрицательным целым числом.");
+    costInput.focus();
+    return;
   }
-  $("ch-cash").textContent = c.cash.toLocaleString("ru-RU") + " эдди";
+
+  if (!Array.isArray(current.gear)) current.gear = [];
+  const item = { name, custom: true };
+  if (cost !== null) item.cost = Math.round(cost);
+  current.gear.push(item);
+  renderSheet(current);
+  saveDraft();
+  nameInput.value = "";
+  costInput.value = "";
+  nameInput.focus();
+  toast("Снаряжение добавлено.");
+}
+
+function setActiveFromInventory(kind, idx) {
+  if (!current || (kind !== "weapon" && kind !== "armor")) return;
+  let item = current.gear[idx];
+  if (!item) return;
+  if (typeof item === "string") {
+    item = current.gear[idx] = { name: item, cost: 0, [kind]: true };
+  } else {
+    item[kind] = true;
+  }
+  const name = item.name;
+  for (const gear of current.gear) {
+    if (gear && typeof gear === "object" && gear[kind]) {
+      gear.active = gear === item;
+    }
+  }
+  current[kind === "armor" ? "activeArmor" : "activeWeapon"] = name;
+  item.active = true;
+  renderSheet(current);
+  saveDraft();
+  toast(`Назначено активным: ${name}`);
+}
+
+function renderLoadout(c) {
+  const activeWeapon = c.gear.find((item) => item && typeof item === "object" && item.weapon && item.active)
+    || c.gear.find((item) => item && typeof item === "object" && item.weapon && item.name === c.activeWeapon);
+  const activeArmor = c.gear.find((item) => item && typeof item === "object" && item.armor && item.active)
+    || c.gear.find((item) => item && typeof item === "object" && item.armor && item.name === c.activeArmor);
+  $("active-weapon-name").textContent = activeWeapon?.name || "не выбрано";
+  $("active-armor-name").textContent = activeArmor?.name || "не выбрана";
+  $("active-weapon-dmg").textContent = activeWeapon ? `урон ${activeWeapon.damage || "?"}` : "—";
+  $("active-armor-sp").textContent = activeArmor ? `SP ${activeArmor.sp ?? "?"}` : "—";
+}
+
+function initGearEditing() {
+  ["gear-list", "implants-list"].forEach((id) => {
+    const list = $(id);
+    if (!list) return;
+    list.addEventListener("click", (event) => {
+      const equipButton = event.target.closest(".gear-equip-btn");
+      if (equipButton && current) {
+        setActiveFromInventory(equipButton.dataset.gearKind, Number(equipButton.dataset.gearIndex));
+        return;
+      }
+      const editButton = event.target.closest(".gear-edit-btn");
+      if (editButton) {
+        const row = editButton.closest(".gear-row");
+        const form = row?.querySelector(".gear-edit-form");
+        if (!form) return;
+        row.classList.add("is-editing");
+        form.hidden = false;
+        form.querySelector('[name="name"]')?.focus();
+        return;
+      }
+      if (event.target.closest(".gear-edit-cancel")) {
+        const form = event.target.closest(".gear-edit-form");
+        form.hidden = true;
+        form.closest(".gear-row")?.classList.remove("is-editing");
+      }
+    });
+    list.addEventListener("submit", (event) => {
+      const form = event.target.closest(".gear-edit-form");
+      if (!form) return;
+      event.preventDefault();
+      if (!current || !form.reportValidity()) return;
+      const index = Number(form.dataset.gearIndex);
+      const oldItem = current.gear[index];
+      if (!oldItem) return;
+      const oldName = typeof oldItem === "object" ? oldItem.name : oldItem;
+      const kind = classifyGearItem(oldItem, current);
+      const name = form.querySelector('[name="name"]').value.trim();
+      const costValue = form.querySelector('[name="cost"]').value.trim();
+      const cost = costValue === "" ? null : Number(costValue);
+      if (!name) {
+        toast("Введите название предмета.");
+        return;
+      }
+      if (cost !== null && (!Number.isInteger(cost) || cost < 0)) {
+        toast("Цена должна быть неотрицательным целым числом.");
+        return;
+      }
+
+      const item = typeof oldItem === "object" ? { ...oldItem } : { name: oldName };
+      item.name = name;
+      if (cost === null) delete item.cost;
+      else item.cost = cost;
+      if (kind === "weapon") {
+        item.weapon = true;
+        const damage = form.querySelector('[name="damage"]')?.value.trim();
+        if (damage) item.damage = damage;
+        else delete item.damage;
+      } else if (kind === "armor") {
+        item.armor = true;
+        const spValue = form.querySelector('[name="sp"]')?.value.trim();
+        if (spValue === "") delete item.sp;
+        else {
+          const sp = Number(spValue);
+          if (!Number.isFinite(sp) || sp < 0) {
+            toast("SP брони должно быть неотрицательным числом.");
+            return;
+          }
+          item.sp = sp;
+        }
+      }
+      current.gear[index] = item;
+      if (current.activeWeapon === oldName) current.activeWeapon = name;
+      if (current.activeArmor === oldName) current.activeArmor = name;
+      renderSheet(current);
+      saveDraft();
+      toast("Предмет обновлён.");
+    });
+  });
 }
 
 // -------------------------------------------------------------
@@ -3318,7 +3579,7 @@ function skillCardHtml(s, i, c) {
   const statVal = c.stats[stat];
   const sum = (typeof statVal === "number" ? statVal : 0) + s.level;
   return `
-    <div class="skill-chip${s.level === 0 ? " zero" : ""}" data-skill="${i}"
+    <div class="skill-chip${s.level === 0 ? " zero" : ""}" data-skill="${escapeHtml(s.name)}"
          title="${skillRu(s.name)} · ${STAT_RU[stat] || stat}">
       <span class="chip-name">${skillRu(s.name)}</span>
       <span class="chip-row">
@@ -3389,11 +3650,13 @@ function renderSkillsTable(c) {
   // при изменении уровня — обновляем данные персонажа и пересобираем таблицу
   body.querySelectorAll("input.lvl-input").forEach((inp) => {
     inp.addEventListener("change", () => {
-      const idx = Number(inp.closest("[data-skill]").dataset.skill);
+      const skillName = inp.closest("[data-skill]")?.dataset.skill;
+      const skill = current.skills.find((s) => s.name === skillName);
+      if (!skill) return;
       let v = Math.round(Number(inp.value));
       if (!Number.isFinite(v)) v = SKILL_MIN;
       v = Math.max(SKILL_MIN, Math.min(SKILL_MAX, v));
-      current.skills[idx].level = v;
+      skill.level = v;
       inp.value = v;
       renderSkillsTable(current);
     });
@@ -3633,6 +3896,14 @@ const LS_KEY = "cp-red-characters";
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; }
 }
+function saveDraft() {
+  if (!current) return;
+  try {
+    const list = loadSaved().filter((c) => !(c && c.name === current.name && c.role === current.role));
+    list.unshift(current);
+    localStorage.setItem(LS_KEY, JSON.stringify(list.slice(0, 20)));
+  } catch { /* приватный режим */ }
+}
 function saveCharacter() {
   if (!current) return toast("Сначала создайте персонажа!");
   // Актуализируем заметки из поля перед сохранением
@@ -3654,7 +3925,7 @@ function renderSaved() {
   box.innerHTML = list
     .map((c, i) => `
       <div class="saved-item">
-        <span><b>${c.name} «${c.nick}»</b><small>${c.roleRu} · ${c.methodName}</small></span>
+        <span><b>${escapeHtml(c.name || "")} «${escapeHtml(c.nick || "")}»</b><small>${escapeHtml(c.roleRu || "")} · ${escapeHtml(c.methodName || "")}</small></span>
         <span class="saved-actions">
           <button class="btn tiny" data-load="${i}">Открыть</button>
           <button class="btn tiny danger" data-del="${i}">✕</button>
@@ -3810,6 +4081,60 @@ function initNotes() {
     updateNotesStatus();
     toast("Заметки очищены");
   });
+  $("btn-toggle-notes")?.addEventListener("click", () => setNotesOpen(true));
+  $("btn-close-notes")?.addEventListener("click", () => setNotesOpen(false));
+  $("notes-col")?.querySelector(".notes-backdrop")?.addEventListener("click", () => setNotesOpen(false));
+  syncNotesVisibility();
+  window.addEventListener("resize", syncNotesVisibility);
+}
+
+function setNotesOpen(open) {
+  const mobile = window.matchMedia("(max-width: 900px)").matches;
+  document.body.classList.toggle("notes-open", mobile && open);
+  syncNotesVisibility();
+  if (mobile && open) $("inp-notes")?.focus();
+  else if (mobile) $("btn-toggle-notes")?.focus();
+}
+
+function syncNotesVisibility() {
+  const mobile = window.matchMedia("(max-width: 900px)").matches;
+  if (!mobile) document.body.classList.remove("notes-open");
+  const open = mobile && document.body.classList.contains("notes-open");
+  $("btn-toggle-notes")?.setAttribute("aria-expanded", String(open));
+  $("notes-col")?.setAttribute("aria-hidden", String(mobile && !open));
+}
+
+function initSheetTabs() {
+  const tabs = [...document.querySelectorAll(".sheet-tab")];
+  const activate = (tab, focus = false) => {
+    const selected = tab.dataset.tab;
+    tabs.forEach((item) => {
+      const active = item === tab;
+      item.classList.toggle("active", active);
+      item.setAttribute("aria-selected", String(active));
+      item.tabIndex = active ? 0 : -1;
+    });
+    document.querySelectorAll(".tab-content").forEach((panel) => {
+      const active = panel.id === `panel-${selected}`;
+      panel.hidden = !active;
+      panel.classList.toggle("hidden", !active);
+    });
+    if (focus) tab.focus();
+  };
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener("click", () => activate(tab));
+    tab.addEventListener("keydown", (event) => {
+      let nextIndex = index;
+      if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+      else if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = tabs.length - 1;
+      else return;
+      event.preventDefault();
+      activate(tabs[nextIndex], true);
+    });
+  });
 }
 
 // ------------------------------------------------------------
@@ -3825,7 +4150,7 @@ function toast(msg) {
 }
 
 // ------------------------------------------------------------
-// Панель генерации персонажа: скрытие / показ (кнопка «◀ Панель» в шапке)
+// Панель генерации персонажа: скрытие / показ кнопкой «Генерация».
 // Состояние запоминается в localStorage, есть горячая клавиша Ctrl+B.
 // ------------------------------------------------------------
 const CONTROLS_LS_KEY = "cp-red-controls-hidden";
@@ -3838,7 +4163,7 @@ function applyControlsVisibility(hidden) {
   document.body.classList.toggle("controls-hidden", hidden);
   const btn = $("btn-toggle-controls");
   if (btn) {
-    btn.textContent = hidden ? "▶ Панель" : "◀ Панель";
+    btn.textContent = "Генерация";
     btn.setAttribute("aria-expanded", String(!hidden));
     btn.title = hidden
       ? "Показать панель генерации персонажа (Ctrl+B)"
@@ -3914,24 +4239,42 @@ function canAfford(cost) {
   return !!current && Number(current.cash) >= Number(cost);
 }
 
-function buyCyberware(item) {
+function buyShopItem(item, shop) {
   if (!current) { toast("Сначала создайте персонажа!"); return; }
   const cost = Number(item.cost) || 0;
   if (!canAfford(cost)) { toast(`Недостаточно эдди: нужно ${cost.toLocaleString("ru-RU")}, есть ${Number(current.cash).toLocaleString("ru-RU")}`); return; }
   current.cash -= cost;
-  // Предмет уходит в инвентарь (объект с названием и ценой — renderSheet это понимает).
-  // Флаг implant:true — основание для отдельного списка «Импланты» на листе.
+  const name = `${item.ru || item.name}${item.name && item.ru ? ` (${item.name})` : ""}`;
+  const entry = { name, cost };
+  let humanityLoss = 0;
+  if (shop.id === "cyberware") {
+    entry.implant = true;
+    humanityLoss = Math.max(0, Number(item.hl) || 0);
+    entry.humanityLoss = humanityLoss;
+    current.hum = Math.max(0, current.hum - humanityLoss);
+    current.stats.EMP = Math.floor(current.hum / 10);
+  }
+  if (shop.id === "weapons") {
+    if (item.damage) {
+      entry.weapon = true;
+      entry.damage = item.damage;
+    } else if (item.sp != null) {
+      entry.armor = true;
+      entry.sp = Number(item.sp);
+    }
+  }
   if (!Array.isArray(current.gear)) current.gear = [];
-  current.gear.push({ name: `${item.ru || item.name}${item.name && item.ru ? ` (${item.name})` : ""}`, cost, implant: true });
+  current.gear.push(entry);
   renderSheet(current);           // обновляем лист: наличные + инвентарь
+  saveDraft();                    // покупки не должны теряться между визитами
   renderShopCatalog(shopCurrent); // перерисовываем кнопки (могла закончиться валюта)
-  toast(`Куплено: ${item.ru || item.name} — −${cost.toLocaleString("ru-RU")} eb (остаток ${Number(current.cash).toLocaleString("ru-RU")} eb)`);
+  const lossNote = humanityLoss ? ` · −${humanityLoss} ЧЕЛ.` : "";
+  toast(`Куплено: ${item.ru || item.name} — −${cost.toLocaleString("ru-RU")} eb${lossNote} (остаток ${Number(current.cash).toLocaleString("ru-RU")} eb)`);
 }
 
 function renderShopCatalog(shop) {
   $("shop-crumb-name").textContent = `${shop.icon || ""} ${shop.ru}`;
   $("shop-src").textContent = shop.src || "";
-  const isCyberware = shop.id === "cyberware";
   const tierRu = { Cheap: "дёшево", Everyday: "обычно", Premium: "премиум", Expensive: "дорого", Illicit: "нелегально" };
   $("shop-groups").innerHTML = shop.groups.map((g) => `
     <section class="shop-group">
@@ -3948,7 +4291,7 @@ function renderShopCatalog(shop) {
             </div>
             <div class="shop-item-side">
               <span class="shop-item-cost">${Number(it.cost).toLocaleString("ru-RU")} eb</span>
-              ${isCyberware ? `<button class="btn tiny shop-buy-btn" type="button" data-item-key="${g.title}|||${it.name}"
+              ${it.kind !== "chart" ? `<button class="btn tiny shop-buy-btn" type="button" data-item-key="${g.title}|||${it.name}"
                   ${canAfford(it.cost) ? "" : "disabled title=\"Недостаточно эдди\""}>💸 Купить</button>` : ""}
             </div>
           </div>`).join("")}
@@ -3956,16 +4299,14 @@ function renderShopCatalog(shop) {
     </section>`).join("");
 
   // Навешиваем обработчики на кнопки покупки (делегирование через dataset)
-  if (isCyberware) {
-    $("shop-groups").querySelectorAll(".shop-buy-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const [groupTitle, itemName] = btn.dataset.itemKey.split("|||");
-        const group = shop.groups.find((x) => x.title === groupTitle);
-        const item = group?.items.find((x) => x.name === itemName);
-        if (item) buyCyberware(item);
-      });
+  $("shop-groups").querySelectorAll(".shop-buy-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const [groupTitle, itemName] = btn.dataset.itemKey.split("|||");
+      const group = shop.groups.find((x) => x.title === groupTitle);
+      const item = group?.items.find((x) => x.name === itemName);
+      if (item) buyShopItem(item, shop);
     });
-  }
+  });
 }
 
 // ------------------------------------------------------------
@@ -4032,6 +4373,7 @@ function init() {
     current.baseNote = `«Полный пакет»: очки распределены вручную (${total} очков)`;
     current.statEdits = 0;
     current.hp = calcHP(buyStats.BODY, buyStats.WILL);
+    current.empMax = buyStats.EMP;
     current.hum = buyStats.EMP * 10;
     current.note = current.baseNote;
     renderSheet(current); // пересобираем лист, включая сумму «уровень + характеристика» у навыков
@@ -4040,8 +4382,25 @@ function init() {
 
   $("btn-save").addEventListener("click", saveCharacter);
   $("btn-print").addEventListener("click", () => window.print());
+  $("manual-gear-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    addManualGear();
+  });
+  $("ch-cash").addEventListener("change", () => {
+    if (!current) return;
+    const cash = Number($("ch-cash").value);
+    if (!Number.isInteger(cash) || cash < 0) {
+      toast("Баланс должен быть неотрицательным целым числом.");
+      renderSheet(current);
+      return;
+    }
+    current.cash = cash;
+    renderSheet(current);
+    saveDraft();
+    toast("Баланс обновлён.");
+  });
 
-  // Скрытие/показ левой панели генерации персонажа (кнопка «◀ Панель» в шапке)
+  // Скрытие/показ панели генерации персонажа
   initControlsToggle();
 
   // Магазин: кнопка в шапке открывает модальное окно выбора магазина
@@ -4052,6 +4411,7 @@ function init() {
     el.addEventListener("click", closeShopModal));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("shop-modal")?.classList.contains("hidden")) closeShopModal();
+    if (e.key === "Escape" && document.body.classList.contains("notes-open")) setNotesOpen(false);
   });
 
   // Горячая клавиша Ctrl+B — скрыть/показать панель генерации (не срабатывает в полях ввода)
@@ -4089,6 +4449,8 @@ function init() {
   });
 
   renderSaved();
+  initGearEditing();
+  initSheetTabs();
   initNotes();   // поле заметок игрока (правая колонка)
   sel.dispatchEvent(new Event("change"));
 

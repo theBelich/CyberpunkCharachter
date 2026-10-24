@@ -108,7 +108,8 @@ export function buildSheetData(c, dict) {
       ["Бодрость (HP)", `${c.hp} / ${c.hp}`],
       ["Тяжело ранен (порог)", Math.ceil(c.hp / 2)],
       ["Спасбросок от смерти", c.stats.BODY],
-      ["Человечность (HUM)", c.hum],
+      ["Человечность (текущая / максимум)", `${c.hum} / ${(c.empMax ?? c.stats.EMP) * 10}`],
+      ["Эмпатия (текущая / максимальная)", `${Math.floor(c.hum / 10)} / ${c.empMax ?? c.stats.EMP}`],
       ["Скорость (MOVE)", c.stats.MOVE],
       ["Наличные (эдди)", c.cash]
     ],
@@ -185,7 +186,9 @@ export function parseImportedJSON(text) {
   c.note ||= "Импортирован из файла";
   c.statsOrder ||= Object.keys(c.stats);
   c.hp ??= calcHPFromStats(c);
-  c.hum ??= (c.stats.EMP || 0) * 10;
+  c.empMax = Math.max(0, Number(c.empMax ?? c.stats.EMP) || 0);
+  c.hum = Math.max(0, Math.min(Number(c.hum ?? c.empMax * 10) || 0, c.empMax * 10));
+  c.stats.EMP = Math.floor(c.hum / 10);
   c.cash ??= 0;
   c.lifepath ||= [];
   // старые/импортированные записи пути без ключей пунктов — дополняем по порядку,
@@ -666,7 +669,8 @@ export function exportPDF(c, dict) {
     [`HP ${c.hp}/${c.hp}`, CP.red],
     [`тяжело ранен ${Math.ceil(c.hp / 2)}`, CP.yellow],
     [`смерть ${c.stats.BODY}`, CP.red],
-    [`HUM ${c.hum}`, CP.cyan],
+    [`HUM ${c.hum}/${(c.empMax ?? c.stats.EMP) * 10}`, CP.cyan],
+    [`EMP ${Math.floor(c.hum / 10)}/${c.empMax ?? c.stats.EMP}`, CP.cyan],
     [`MOVE ${c.stats.MOVE}`, CP.cyan]
   ];
   {

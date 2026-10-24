@@ -12,14 +12,15 @@
 
   <!-- ===== Шапка ===== -->
   <header class="app-head">
+    <button class="btn generation-toggle" id="btn-toggle-controls" type="button" aria-expanded="true" aria-controls="controls-panel" title="Скрыть панель генерации персонажа (Ctrl+B)">Генерация</button>
     <div class="brand">
       <span class="brand-red">CYBERPUNK</span>
       <span class="brand-outline">RED</span>
       <small>Лист персонажа · Найт-Сити 2045 · данные: Data/Cyberpunk Red Core Rulebook v1.25.pdf</small>
     </div>
     <div class="head-actions">
-      <button class="btn ghost" id="btn-toggle-controls" type="button" aria-expanded="true" aria-controls="controls-panel" title="Скрыть / показать панель генерации персонажа (Ctrl+B)">◀ Панель</button>
       <button class="btn primary" id="btn-shop" type="button" title="Открыть магазин Найт-Сити: киберимпланты, оружие, расходники, бакалея, одежда">🛒 Открыть магазин</button>
+      <button class="btn ghost notes-toggle" id="btn-toggle-notes" type="button" aria-expanded="false" aria-controls="notes-col">📝 Заметки</button>
       <button class="btn ghost" id="btn-print" type="button">Печать</button>
       <button class="btn" id="btn-save" type="button">Сохранить</button>
     </div>
@@ -201,22 +202,32 @@
             <div class="dstat"><span>Бодрость (HP)</span><b id="d-hp">—</b></div>
             <div class="dstat"><span>Тяжело ранен (порог)</span><b id="d-sw">—</b></div>
             <div class="dstat"><span>Спасбросок от смерти</span><b id="d-ds">—</b></div>
-            <div class="dstat"><span>Человечность (HUM)</span><b id="d-hum">—</b></div>
+            <div class="dstat"><span>Человечность (текущая / максимум)</span><b id="d-hum">—</b></div>
+            <div class="dstat" title="Текущая эмпатия = текущая человечность, делённая на 10 с округлением вниз; максимум равен исходной ЭМП.">
+              <span>Эмпатия (EMP, текущая / макс.)</span><b id="d-emp">—</b>
+            </div>
             <div class="dstat"><span>Скорость (MOVE)</span><b id="d-move">—</b></div>
           </div>
         </div>
 
-        <div class="panel two-col">
-          <div>
-            <!-- Контейнер групп умений: раньше это был <table>, теперь — сетка скруглённых карточек -->
+        <div class="panel sheet-tabs">
+          <div class="tab-list" role="tablist" aria-label="Разделы листа персонажа">
+            <button class="sheet-tab active" id="tab-skills" type="button" role="tab" aria-selected="true" aria-controls="panel-skills" data-tab="skills">Навыки</button>
+            <button class="sheet-tab" id="tab-lifepath" type="button" role="tab" aria-selected="false" aria-controls="panel-lifepath" data-tab="lifepath" tabindex="-1">Жизненный путь</button>
+            <button class="sheet-tab" id="tab-inventory" type="button" role="tab" aria-selected="false" aria-controls="panel-inventory" data-tab="inventory" tabindex="-1">Инвентарь</button>
+            <button class="sheet-tab" id="tab-implants" type="button" role="tab" aria-selected="false" aria-controls="panel-implants" data-tab="implants" tabindex="-1">Импланты</button>
+          </div>
+
+          <section class="tab-content" id="panel-skills" role="tabpanel" aria-labelledby="tab-skills" tabindex="0">
             <h2>Умения (навыки) — по группам; клик по названию группы скрывает её содержимое</h2>
             <div class="skills-wrap">
               <div id="skills-body" class="skill-groups">
                 <p class="muted small">Сначала создайте персонажа.</p>
               </div>
             </div>
-          </div>
-          <div>
+          </section>
+
+          <section class="tab-content hidden" id="panel-lifepath" role="tabpanel" aria-labelledby="tab-lifepath" tabindex="0" hidden>
             <h2>Жизненный путь</h2>
             <div class="gen-row lp-actions">
               <button class="btn tiny" id="btn-lp-roll" type="button"
@@ -224,43 +235,58 @@
               <button class="btn tiny ghost" id="btn-lp-pick" type="button"
                       title="Открыть выбор каждого пункта пути из таблиц игры (для выбранной роли)">✍ Выбрать вручную</button>
             </div>
-            <!-- Панель ручного выбора жизненного пути -->
             <div class="manual-box hidden" id="lp-editor"></div>
             <div class="lifepath" id="lifepath">
               <p class="muted small">Создайте персонажа, чтобы вытянуть жизненный путь.</p>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <div class="panel">
-          <h2>Снаряжение и кредиты</h2>
-          <ul class="list" id="gear-list">
-            <li class="muted">Нет данных — персонаж ещё не создан.</li>
-          </ul>
-          <p class="small"><i>Наличные:</i> <b id="ch-cash">—</b></p>
-
-          <!-- Активные оружие и броня: только одно оружие и одна броня могут быть активны -->
-          <div class="loadout-box" id="loadout-box">
-            <h3 class="loadout-title">🎯 Экипировка</h3>
-            <div class="loadout-row">
-              <span class="loadout-label">⚔️ Активное оружие:</span>
-              <span class="loadout-value" id="active-weapon-name">не выбрано</span>
-              <span class="loadout-stat" id="active-weapon-dmg" title="Урон оружия (можно изменить, нажав на него)">—</span>
-              <button class="btn tiny ghost" id="btn-change-weapon" type="button" title="Выбрать активное оружие из инвентаря или добавить новое">Сменить</button>
+          <section class="tab-content hidden" id="panel-inventory" role="tabpanel" aria-labelledby="tab-inventory" tabindex="0" hidden>
+            <h2>Снаряжение</h2>
+            <div class="gear-columns">
+              <span>Предмет</span><span>Урон (кубы)</span><span>SP</span><span>Цена</span><span aria-hidden="true"></span>
             </div>
-            <div class="loadout-row">
-              <span class="loadout-label">🛡️ Активная броня:</span>
-              <span class="loadout-value" id="active-armor-name">не выбрана</span>
-              <span class="loadout-stat" id="active-armor-sp" title="SP брони — защита; нажмите, чтобы изменить">—</span>
-              <button class="btn tiny ghost" id="btn-change-armor" type="button" title="Выбрать активную броню из инвентаря или добавить новую">Сменить</button>
+            <ul class="list" id="gear-list">
+              <li class="muted">Нет данных — персонаж ещё не создан.</li>
+            </ul>
+            <form class="manual-gear-form" id="manual-gear-form">
+              <label>
+                Название предмета
+                <input type="text" id="inp-gear-name" maxlength="100" placeholder="Например: Аптечка" required disabled />
+              </label>
+              <label>
+                Цена (необязательно, не списывается)
+                <input type="number" id="inp-gear-cost" min="0" step="1" inputmode="numeric" placeholder="0" disabled />
+              </label>
+              <button class="btn tiny" type="submit" disabled>＋ Добавить снаряжение</button>
+            </form>
+            <div class="loadout-box" id="loadout-box">
+              <h3 class="loadout-title">🎯 Экипировка</h3>
+              <div class="loadout-row">
+                <span class="loadout-label">⚔️ Активное оружие:</span>
+                <span class="loadout-value" id="active-weapon-name">не выбрано</span>
+                <span class="loadout-stat" id="active-weapon-dmg" title="Урон оружия (можно изменить, нажав на него)">—</span>
+                <button class="btn tiny ghost" id="btn-change-weapon" type="button" title="Выбрать активное оружие из инвентаря или добавить новое">Сменить</button>
+              </div>
+              <div class="loadout-row">
+                <span class="loadout-label">🛡️ Активная броня:</span>
+                <span class="loadout-value" id="active-armor-name">не выбрана</span>
+                <span class="loadout-stat" id="active-armor-sp" title="SP брони — защита; нажмите, чтобы изменить">—</span>
+                <button class="btn tiny ghost" id="btn-change-armor" type="button" title="Выбрать активную броню из инвентаря или добавить новое">Сменить</button>
+              </div>
             </div>
-          </div>
+          </section>
 
-          <!-- Импланты: отдельный список (киберимпланты, купленные в магазине) -->
-          <div class="implants-box hidden" id="implants-box">
-            <h3 class="implants-title">💾 Импланты <span class="implants-count small muted" id="implants-count"></span></h3>
-            <ul class="list implants-list" id="implants-list"></ul>
-          </div>
+          <section class="tab-content hidden" id="panel-implants" role="tabpanel" aria-labelledby="tab-implants" tabindex="0" hidden>
+            <div id="implants-box">
+              <h2 class="implants-title">💾 Импланты <span class="implants-count small muted" id="implants-count"></span></h2>
+              <div class="gear-columns">
+                <span>Предмет</span><span>Урон (кубы)</span><span>SP</span><span>Цена</span><span aria-hidden="true"></span>
+              </div>
+              <ul class="list implants-list" id="implants-list"></ul>
+              <p class="muted small" id="implants-empty">Имплантов пока нет — их можно купить в магазине киберимплантов.</p>
+            </div>
+          </section>
         </div>
 
         <footer class="sheet-foot">
@@ -271,9 +297,13 @@
     </section>
 
     <!-- ===== Поле заметок игрока (правая колонка) ===== -->
-    <aside class="notes-col" aria-label="Заметки игрока">
+    <aside class="notes-col" id="notes-col" aria-label="Заметки игрока" aria-hidden="false">
+      <button class="notes-backdrop" type="button" aria-label="Закрыть заметки" tabindex="-1"></button>
       <section class="mode-panel notes-panel">
-        <h2>📝 Заметки игрока</h2>
+        <div class="notes-heading">
+          <h2>📝 Заметки игрока</h2>
+          <button class="btn tiny ghost notes-close" id="btn-close-notes" type="button">✕ Закрыть</button>
+        </div>
         <p class="muted small">Личный блокнот: квесты, контакты, инвентарь, планы. Сохраняется в браузере (localStorage).</p>
         <textarea id="inp-notes" class="notes-area" rows="18" spellcheck="false"
                   placeholder="Записи персонажа&#10;&#10;— Заказчик: ...&#10;— Цель: ...&#10;— Долги: ..."></textarea>
@@ -286,6 +316,12 @@
       </section>
     </aside>
   </main>
+
+  <section class="cash-widget" aria-label="Баланс кредитов">
+    <label for="ch-cash">Кредиты</label>
+    <input type="number" id="ch-cash" min="0" step="1" inputmode="numeric" value="" placeholder="—" disabled aria-label="Текущий баланс в эдди" />
+    <span>эдди</span>
+  </section>
 
   <!-- ===== Модальное окно «Магазины Найт-Сити» ===== -->
   <div class="shop-modal hidden" id="shop-modal" role="dialog" aria-modal="true" aria-labelledby="shop-modal-title">
