@@ -2,6 +2,10 @@
 setlocal
 
 set "ROOT=%~dp0"
+set "BUILD=%ROOT%build"
+
+if exist "%BUILD%" rmdir /s /q "%BUILD%"
+if exist "%BUILD%" goto failed
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\build-standalone.ps1" -ProjectRoot "%ROOT%."
 if errorlevel 1 goto failed
